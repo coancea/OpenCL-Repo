@@ -1,8 +1,9 @@
 #include "../utils/Util.h"
 #include "../utils/GPU_Constants.h"
 
-#define logWORKGROUP_SIZE   7
-#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
+//#define logWORKGROUP_SIZE   7
+//#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
+#define WORKGROUP_SIZE      256
 #define REPEAT              15
 #define ELEMS_PER_THREAD    9
 
@@ -24,7 +25,7 @@ void runMemCopy(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
                                              &globalWorkSize, &localWorkSize, 0, NULL, NULL);
             clFinish(ctrl.cqCommandQueue);
             oclCheckError(ciErr1, CL_SUCCESS);
-        }
+        } 
 
         unsigned long int elapsed;
         struct timeval t_start, t_end, t_diff;
