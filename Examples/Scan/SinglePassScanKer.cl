@@ -340,7 +340,6 @@ __kernel void singlePassScanKer (
     barrier(CLK_LOCAL_MEM_FENCE);
 
     ElTp prefix = NE;
-#if 1
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
     {
         if ( (id == 0) && (tid == 0) ) { // id 0, first warp, first lane
@@ -360,6 +359,10 @@ __kernel void singlePassScanKer (
             int32_t read_offset = id - 32;
             int32_t LOOP_STOP = -100;
             __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
+	    
+    	    if (statusflgs[id-1] == STATUS_P) {
+	        if (lane==0) prefix = incprefix[id-1];
+	    } else 
             while (read_offset != LOOP_STOP) {
                 int32_t read_i = read_offset + lane;
 
@@ -412,7 +415,7 @@ __kernel void singlePassScanKer (
         if (id != 0) prefix = exchange[0];
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-#endif
+
     { // finally read and add prefix to every element in this workgroup
       // Coalesced write to global-output 'data' from register 'chunk' by means of shared memory
         ElTp myacc = binOp(prefix, acc);

@@ -3,8 +3,8 @@
 
 //#define logWORKGROUP_SIZE   7
 //#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define WORKGROUP_SIZE      256
-#define REPEAT              15
+#define WORKGROUP_SIZE      224
+#define REPEAT              5
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"
