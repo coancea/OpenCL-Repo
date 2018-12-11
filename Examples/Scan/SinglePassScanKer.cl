@@ -350,19 +350,22 @@ __kernel void singlePassScanKer (
         } else if ( (id != 0) && (tid < WARP) ) { // id != 0, first warp, all lanes
             const int32_t lane = tid & (WARP-1);
             // parallel lookback in last warp
+
             if ( lane == 0 ) { // first lane
                 aggregates[id] = acc;
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[id] = STATUS_A;
             }
-             
+          uint8_t stat1 = statusflgs[id-1];
+	  if (stat1 == STATUS_P) {
+                if(lane==0) prefix = incprefix[id-1];
+          //} else if ((stat1 == STATUS_A) && (id > 1) && (statusflgs[id-2] == STATUS_P) ) {
+          //      if(lane==0) prefix = binOp(incprefix[id-2], incprefix[id-1]);
+          } else {   
             int32_t read_offset = id - 32;
             int32_t LOOP_STOP = -100;
             __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
 	    
-    	    if (statusflgs[id-1] == STATUS_P) {
-	        if (lane==0) prefix = incprefix[id-1];
-	    } else 
             while (read_offset != LOOP_STOP) {
                 int32_t read_i = read_offset + lane;
 
@@ -400,7 +403,7 @@ __kernel void singlePassScanKer (
                 mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
                 read_offset = block_id[0];
             }
-
+          }
             if (lane == 0) { 
                 // publish prefix an status for next workgroups
                 incprefix[id] = binOp(prefix, acc);
