@@ -693,8 +693,8 @@ void build_for_GPU(
         // 5. create command queues for all available devices
         for (cl_uint i = 0; i < nDevice; i++) {
 	        shrLog(stdlog, "Creating command queue for device %d\n", i);
-            //cqCommandQueue[i] = clCreateCommandQueue(cxGPUContext, cdDevices[i], 0, &ciErr1);
-            cqCommandQueue[i] = clCreateCommandQueueWithProperties(cxGPUContext, cdDevices[i], NULL, &ciErr1);
+            cqCommandQueue[i] = clCreateCommandQueue(cxGPUContext, cdDevices[i], 0, &ciErr1);
+            //cqCommandQueue[i] = clCreateCommandQueueWithProperties(cxGPUContext, cdDevices[i], NULL, &ciErr1);
             oclCheckErrorEX(ciErr1, CL_SUCCESS, NULL);
         }
 

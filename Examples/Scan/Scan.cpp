@@ -1,9 +1,9 @@
 #include "../utils/Util.h"
 #include "../utils/GPU_Constants.h"
 
-#define logWORKGROUP_SIZE   8
+#define logWORKGROUP_SIZE   7
 #define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define REPEAT              5
+#define REPEAT              15
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"

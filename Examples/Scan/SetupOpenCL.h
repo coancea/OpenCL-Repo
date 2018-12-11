@@ -151,7 +151,7 @@ void initKernels(const bool is_sgm) {
         if (is_sgm)
             ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG, NULL); // local memory for flags
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG * sizeof(ElTp), NULL); // local memory for elements
-        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, WARP, NULL); // __local warpscan: encodes both number of used and status flags.
+//        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, WARP, NULL); // __local warpscan: encodes both number of used and status flags.
         oclCheckError(ciErr, CL_SUCCESS);
     }
 
