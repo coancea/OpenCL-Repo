@@ -16,7 +16,7 @@ typedef struct FlgTup {
 } FlgTuple;
 
 inline ElTp binOp(ElTp v1, ElTp v2) {
-    return v1 + v2;
+    return (v1 + v2);
 }
 
 inline FlgTuple binOpFlg(FlgTuple t1, FlgTuple t2) {
