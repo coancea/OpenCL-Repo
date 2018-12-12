@@ -1,9 +1,5 @@
 #include "../utils/Util.h"
-#include "../utils/GPU_Constants.h"
 
-//#define logWORKGROUP_SIZE   7
-//#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define WORKGROUP_SIZE      224
 #define REPEAT              5
 #define ELEMS_PER_THREAD    9
 

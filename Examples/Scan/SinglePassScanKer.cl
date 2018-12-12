@@ -202,9 +202,20 @@ incSgmScanWarp  ( __local volatile uint8_t* sh_flag
     FlgTuple res; res.flg = sh_flag[th_id]; res.val = sh_data[th_id]; return res;
 }
 
+inline void 
+incScanGroup( __local volatile ElTp* sh_data, const size_t tid) {
+    const size_t lane   = tid & (WARP-1);
+
+    #pragma unroll
+    for(uint32_t i=0; i<logWORKGROUP_SIZE; i++) {
+        const uint32_t p = (1<<i);
+        if ( lane >= p ) sh_data[tid] = binOp( sh_data[tid-p], sh_data[tid] );
+        if ( i >= lgWARP ) barrier(CLK_LOCAL_MEM_FENCE);
+    }
+} 
 
 inline void 
-incScanGroup( __local volatile ElTp*   sh_data, const size_t tid) {
+incScanGroup0( __local volatile ElTp*   sh_data, const size_t tid) {
     const size_t lane   = tid & (WARP-1);
     const size_t warpid = tid >> lgWARP;
 

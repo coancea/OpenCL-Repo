@@ -3,6 +3,12 @@ typedef float     ElTp;
 #define NE          0
 #define EPS         0.001
 
+#define lgWARP              5
+#define WARP                (1<<lgWARP)
+
+#define logWORKGROUP_SIZE   7
+//#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
+#define WORKGROUP_SIZE      128
 
 typedef struct FlgTup {
     uint8_t flg;
