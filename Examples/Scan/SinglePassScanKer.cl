@@ -59,7 +59,7 @@ inline uint8_t mkStatusUsed(uint8_t usd, uint8_t flg) { return (usd << 2) + flg;
 //     return (flag2, value2, used2)
 // return (flag1, operator(value1, value2), used1+used2)
 
-#if 0
+#if 1
 inline void
 binOpInLocMem( __local volatile ElTp*    sh_data
              , __local volatile uint8_t* sh_status
@@ -408,9 +408,9 @@ __kernel void singlePassScanKer (
             uint8_t stat1 = statusflgs[id-1];
 	        if (stat1 == STATUS_P) {
                 if(lane==0) prefix = incprefix[id-1];
-            } else {
-
-#if 0
+            } else 
+	    {
+#if 1
                 int32_t read_offset = id - WARP;
                 int32_t LOOP_STOP = -100;
                 __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
@@ -434,7 +434,8 @@ __kernel void singlePassScanKer (
                     // init local data for warp-reduce
                     exchange[lane]       = aggr;
                     warpscan[lane]       = mkStatusUsed(used, flag);
-                    incSpecialScanWarp(exchange, warpscan, lane);
+		    if(warpscan[WARP-1] != STATUS_P)
+                        incSpecialScanWarp(exchange, warpscan, lane);
 
                     if ( lane == 0 ) {
                         // read result from local data after warp reduce
@@ -449,10 +450,11 @@ __kernel void singlePassScanKer (
                             read_offset = LOOP_STOP;
                         block_id[0] = read_offset;
                     }
-                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
+                    //mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
                     read_offset = block_id[0];
                 }
 #else
+		// COSMIN
                 volatile __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
                 int32_t read_i = id - WARP + lane;
                 bool goOn = true;
@@ -470,7 +472,10 @@ __kernel void singlePassScanKer (
                     // init local data for warp-reduce
                     exchange[lane]       = aggr;
                     warpscan[lane]       = flag;
-                    incSpecialScanWarp(exchange, warpscan, lane);
+
+		    if(warpscan[WARP-1] != STATUS_P) {
+                        incSpecialScanWarp(exchange, warpscan, lane);
+                    }
                     //mem_fence(CLK_LOCAL_MEM_FENCE);
                     goOn = (warpscan[WARP-1] != STATUS_P);
                 }

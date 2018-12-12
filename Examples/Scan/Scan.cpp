@@ -1,6 +1,6 @@
 #include "../utils/Util.h"
 
-#define REPEAT              5
+#define REPEAT              200
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"
@@ -220,6 +220,9 @@ int main() {
     testOnlyScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testOnlyScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+
+    const uint32_t M = 4096*4096;
+    testOnlyScan(M, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     oclControlCleanUp();
     free(cpu_inp);
