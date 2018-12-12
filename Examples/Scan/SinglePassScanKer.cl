@@ -66,13 +66,12 @@ binOpInLocMem( __local volatile ElTp*    sh_data
 ) {
     ElTp agg1 = sh_data[acc_th];
     ElTp agg2 = sh_data[cur_th];
-    uint8_t usd1, usd2, stat1, stat2;
+    uint8_t usd1, stat1, stat2;
     uint8_t tmp = sh_status[acc_th];
     stat1 = getStatus(tmp); 
     usd1  = getUsed(tmp);
-    tmp   = sh_status[cur_th];    
+    tmp   = sh_status[cur_th];
     stat2 = getStatus(tmp);
-
     if (stat2 != STATUS_A) {
         agg1 = NE;
         usd1 = 0;
@@ -90,30 +89,25 @@ flgBinOpInLocMem( __local volatile ElTp*    sh_data
                 , __local volatile uint8_t* sh_flags
                 , const size_t acc_th,  const size_t cur_th
 ) {
-    uint8_t flg1 = sh_flags[acc_th];
-    uint8_t flg2 = sh_flags[cur_th];
-    ElTp agg1 = sh_data[acc_th];
-    ElTp agg2 = sh_data[cur_th];
-    uint8_t usd1, usd2, stat1, stat2;
+    FlgTuple tup1; tup1.flg = sh_flags[acc_th]; tup1.val = sh_data[acc_th];
+    FlgTuple tup2; tup2.flg = sh_flags[cur_th]; tup2.val = sh_data[cur_th];
+    uint8_t usd1, stat1, stat2;
     uint8_t tmp = sh_status[acc_th];
     stat1 = getStatus(tmp); usd1 = getUsed(tmp);
-    tmp = sh_status[cur_th];    
-    stat2 = getStatus(tmp); usd2 = getUsed(tmp);
-
+    tmp = sh_status[cur_th];
+    stat2 = getStatus(tmp);
     if (stat2 != STATUS_A) {
-        flg1 = 0;
-        agg1 = NE;
-        usd1 = 0;
-        stat1 = stat2;
+        tup1.flg = 0;
+        tup1.val = NE;
+        usd1     = 0;
+        stat1    = stat2;
     }
-    usd1 += usd2;
+    usd1 += getUsed(tmp);
     sh_status[cur_th] = mkStatusUsed(usd1, stat1);
     {
-        FlgTuple tup1; tup1.flg = flg1; tup1.val = agg1;
-        FlgTuple tup2; tup2.flg = flg2; tup2.val = agg2;
         FlgTuple res = binOpFlg( tup1, tup2 );
         sh_flags[cur_th] = res.flg;
-        sh_data[cur_th] = res.val;
+        sh_data [cur_th] = res.val;
     }
 }
 
