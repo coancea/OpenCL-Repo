@@ -2,7 +2,6 @@ typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
 
-#define WARP (1<<lgWARP)
 #include "GenericHack.h"
 
 __kernel void memcpy_wflags ( 
@@ -203,16 +202,18 @@ incSgmScanWarp  ( __local volatile uint8_t* sh_flag
 }
 
 inline void 
-incScanGroup( __local volatile ElTp* sh_data, const size_t tid) {
-    const size_t lane   = tid & (WARP-1);
+incScanGroup( __local volatile ElTp* sh_data, const size_t th_id) {
+    ElTp res;
 
     #pragma unroll
     for(uint32_t i=0; i<logWORKGROUP_SIZE; i++) {
         const uint32_t p = (1<<i);
-        if ( lane >= p ) sh_data[tid] = binOp( sh_data[tid-p], sh_data[tid] );
-        if ( i >= lgWARP ) barrier(CLK_LOCAL_MEM_FENCE);
+        if ( th_id >= p ) res = binOp( sh_data[th_id-p], sh_data[th_id] );
+        barrier(CLK_LOCAL_MEM_FENCE);
+        if ( th_id >= p ) sh_data[th_id] = res;
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
-} 
+}  
 
 inline void 
 incScanGroup0( __local volatile ElTp*   sh_data, const size_t tid) {

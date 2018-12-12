@@ -6,9 +6,9 @@ typedef float     ElTp;
 #define lgWARP              5
 #define WARP                (1<<lgWARP)
 
-#define logWORKGROUP_SIZE   7
+#define logWORKGROUP_SIZE   8
 //#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define WORKGROUP_SIZE      128
+#define WORKGROUP_SIZE      224
 
 typedef struct FlgTup {
     uint8_t flg;
