@@ -405,80 +405,78 @@ __kernel void singlePassScanKer (
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[id] = STATUS_A;
             }
-          uint8_t stat1 = statusflgs[id-1];
-	  if (stat1 == STATUS_P) {
+            uint8_t stat1 = statusflgs[id-1];
+	        if (stat1 == STATUS_P) {
                 if(lane==0) prefix = incprefix[id-1];
-          //} else if ((stat1 == STATUS_A) && (id > 1) && (statusflgs[id-2] == STATUS_P) ) {
-          //      if(lane==0) prefix = binOp(incprefix[id-2], incprefix[id-1]);
-          } else {
+            } else {
 
 #if 0
-            int32_t read_offset = id - WARP;
-            int32_t LOOP_STOP = -100;
-            __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
-	    
-            while (read_offset != LOOP_STOP) {
-                int32_t read_i = read_offset + lane;
+                int32_t read_offset = id - WARP;
+                int32_t LOOP_STOP = -100;
+                __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
+	        
+                while (read_offset != LOOP_STOP) {
+                    int32_t read_i = read_offset + lane;
 
-                // Read WARP flag/aggregate values in the warp
-                ElTp    aggr = NE;
-                uint8_t flag = STATUS_X;
-                uint8_t used = 0;
-                if (read_i >= 0) {
-                    flag = statusflgs[read_i];
-                    if (flag == STATUS_P) {
-                        aggr = incprefix[read_i];
-                    } else if (flag == STATUS_A) {
-                        aggr = aggregates[read_i];
-                        used = 1;
+                    // Read WARP flag/aggregate values in the warp
+                    ElTp    aggr = NE;
+                    uint8_t flag = STATUS_X;
+                    uint8_t used = 0;
+                    if (read_i >= 0) {
+                        flag = statusflgs[read_i];
+                        if (flag == STATUS_P) {
+                            aggr = incprefix[read_i];
+                        } else if (flag == STATUS_A) {
+                            aggr = aggregates[read_i];
+                            used = 1;
+                        }
                     }
-                }
-                // init local data for warp-reduce
-                exchange[lane]       = aggr;
-                warpscan[lane]       = mkStatusUsed(used, flag);
-                incSpecialScanWarp(exchange, warpscan, lane);
+                    // init local data for warp-reduce
+                    exchange[lane]       = aggr;
+                    warpscan[lane]       = mkStatusUsed(used, flag);
+                    incSpecialScanWarp(exchange, warpscan, lane);
 
-                if ( lane == 0 ) {
-                    // read result from local data after warp reduce
-                    uint8_t usedflg_val = warpscan[WARP-1];
-                    used = getUsed  (usedflg_val);
-                    flag = getStatus(usedflg_val);
-                    aggr = exchange[WARP-1];
+                    if ( lane == 0 ) {
+                        // read result from local data after warp reduce
+                        uint8_t usedflg_val = warpscan[WARP-1];
+                        used = getUsed  (usedflg_val);
+                        flag = getStatus(usedflg_val);
+                        aggr = exchange[WARP-1];
 
-                    prefix = binOp(aggr, prefix);
-                    read_offset -= used;
-                    if (flag == STATUS_P)
-                        read_offset = LOOP_STOP;
-                    block_id[0] = read_offset;
+                        prefix = binOp(aggr, prefix);
+                        read_offset -= used;
+                        if (flag == STATUS_P)
+                            read_offset = LOOP_STOP;
+                        block_id[0] = read_offset;
+                    }
+                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
+                    read_offset = block_id[0];
                 }
-                mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
-                read_offset = block_id[0];
-            }
 #else
-            volatile __local uint8_t* warpscan = (__local uint8_t*)(exchange+2*WARP);
-            int32_t read_i = id - WARP + lane;
-            bool goOn = true;
-            while (goOn) {
-                ElTp    aggr = NE;
-                uint8_t flag = STATUS_X;
-                if (read_i >= 0) {
-                    flag = statusflgs[read_i];
-                    if (flag == STATUS_P) {
-                        aggr = incprefix[read_i];
-                    } else if (flag == STATUS_A) {
-                        aggr = aggregates[read_i];
+                volatile __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
+                int32_t read_i = id - WARP + lane;
+                bool goOn = true;
+                while (goOn) {
+                    ElTp    aggr = NE;
+                    uint8_t flag = STATUS_X;
+                    if (read_i >= 0) {
+                        flag = statusflgs[read_i];
+                        if (flag == STATUS_P) {
+                            aggr = incprefix[read_i];
+                        } else if (flag == STATUS_A) {
+                            aggr = aggregates[read_i];
+                        }
                     }
+                    // init local data for warp-reduce
+                    exchange[lane]       = aggr;
+                    warpscan[lane]       = flag;
+                    incSpecialScanWarp(exchange, warpscan, lane);
+                    //mem_fence(CLK_LOCAL_MEM_FENCE);
+                    goOn = (warpscan[WARP-1] != STATUS_P);
                 }
-                // init local data for warp-reduce
-                exchange[lane]       = aggr;
-                warpscan[lane]       = flag;
-                incSpecialScanWarp(exchange, warpscan, lane);
-                mem_fence(CLK_LOCAL_MEM_FENCE);
-                goOn = (warpscan[WARP-1] != STATUS_P);
-            }
-            if (lane==0) prefix = exchange[WARP-1];
+                if (lane==0) prefix = exchange[WARP-1];
 #endif
-          }
+            }
             if (lane == 0) { 
                 // publish prefix an status for next workgroups
                 incprefix[id] = binOp(prefix, acc);

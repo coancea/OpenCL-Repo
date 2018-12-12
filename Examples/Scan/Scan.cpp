@@ -210,17 +210,16 @@ int main() {
         initOclControl();
     }
 
-    testOnlyScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-
-    testOnlyScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-
-    testOnlyScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-
-    testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+
+
+    testOnlyScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testOnlyScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testOnlyScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     oclControlCleanUp();
     free(cpu_inp);
