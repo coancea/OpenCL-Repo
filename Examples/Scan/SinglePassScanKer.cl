@@ -34,9 +34,9 @@ enum {
     STATUS_P = 2
 }; 
 
-inline uint8_t getStatus(uint8_t usd_flg) { return usd_flg &  3; }
-inline uint8_t getUsed  (uint8_t usd_flg) { return usd_flg >> 2; }
-inline uint8_t mkStatusUsed(uint8_t usd, uint8_t flg) { return (usd << 2) + flg; }
+inline uint8_t getStatus(const uint8_t usd_flg) { return usd_flg &  3; }
+inline uint8_t getUsed  (const uint8_t usd_flg) { return usd_flg >> 2; }
+inline uint8_t mkStatusUsed(const uint8_t usd, const uint8_t flg) { return (usd << 2) + flg; }
 
 // Warp-reduce over the values, using an operator that does
 // the following:
@@ -373,7 +373,7 @@ __kernel void singlePassScanKer (
             acc = NE;
         }
         if ( (WG_ID != 0) && (tid < WARP) ) { // WG_ID != 0, first warp, all lanes
-            volatile __local uint8_t *restrict warpscan = (volatile __local uint8_t*)(exchange+WARP);
+            volatile __local uint8_t *restrict warpscan = (volatile __local uint8_t*)(exchange+get_local_size(0));
             
             if ( tid == 0 ) { // first lane
                 // publish the partial result a.s.a.p.
@@ -415,13 +415,13 @@ __kernel void singlePassScanKer (
                     }
                     exchange[tid]       = aggr;
                     warpscan[tid]       = mkStatusUsed(used, flag);
-                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    //mem_fence(CLK_LOCAL_MEM_FENCE);
                     // perform reduce
                     if(warpscan[WARP-1] != STATUS_P)
                         incSpecialScanWarp(exchange, warpscan, tid);
-                    mem_fence(CLK_LOCAL_MEM_FENCE);
-                    if ( tid == 0 ) {
-                        // read result from local data after warp reduce
+                    //mem_fence(CLK_LOCAL_MEM_FENCE);
+                    
+                    { // read result from local data after warp reduce
                         uint8_t usedflg_val = warpscan[WARP-1];
                         flag = getStatus(usedflg_val);
                         if (flag == STATUS_P) { // LOOP WILL BE EXITED
@@ -430,14 +430,12 @@ __kernel void singlePassScanKer (
                             used = getUsed  (usedflg_val);
                             read_offset = read_offset - used;
                         }
-                        block_id[0] = read_offset;
-
+                    }
+                    if ( tid == 0 ) {
                         // update prefix with the current contribution
                         aggr = exchange[WARP-1];
                         prefix = binOp(aggr, prefix);
                     }
-                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
-                    read_offset = block_id[0];
                 } // END WHILE loop
             } // END ELSE branch of if (stat1 == STATUS_P)
             if(tid == 0) {
@@ -494,8 +492,8 @@ __kernel void singlePassSgmScanKer (
         __local  ElTp*    exchange
 ) { 
     const size_t  tid = get_local_id(0);
-    volatile __global uint8_t* aggr_flgs = statusflgs + num_blocks_pad;
-    volatile __global uint8_t* incp_flgs = aggr_flgs  + num_blocks_pad;
+    //volatile __global uint8_t* aggr_flgs = statusflgs + num_blocks_pad;
+    //volatile __global uint8_t* incp_flgs = aggr_flgs  + num_blocks_pad;
 
     if (tid == 0) {
         int32_t id  = atomic_add(&global_id[0], 1);
@@ -583,9 +581,10 @@ __kernel void singlePassSgmScanKer (
         volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
         if ( (WG_ID == 0) && (tid == 0) ) { // first workgroup, first thread
             incprefix[WG_ID] = acc.val;
-            incp_flgs[WG_ID] = acc.flg;
+            //incp_flgs[WG_ID] = acc.flg;
+            if (acc.flg > 0) { acc.flg = 1; } // COSMIN
             mem_fence(CLK_GLOBAL_MEM_FENCE);
-            statusflgs[WG_ID] = STATUS_P;
+            statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_P);
             // reset accumulator
             acc.flg = 0; acc.val = NE;
         } 
@@ -594,22 +593,23 @@ __kernel void singlePassSgmScanKer (
             if ( tid == 0 ) { // first thread
                 // record this workgroup status a.s.a.p.
                 aggregates[WG_ID] = acc.val;
-                aggr_flgs[WG_ID]  = acc.flg;
+                //aggr_flgs[WG_ID]  = acc.flg;
+                if (acc.flg > 0) { acc.flg = 1; } // COSMIN
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[WG_ID] = STATUS_A;
+                statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_A);
                 // read previous workgroup status for fasttrack opportunity
                 warpscan[0] = statusflgs[WG_ID-1];
             }
             mem_fence(CLK_LOCAL_MEM_FENCE); 
             uint8_t stat1 = warpscan[0];
-	        if (stat1 == STATUS_P) {
+	        if (getStatus(stat1) == STATUS_P) {
                 // important performance optimization:
                 // do not enter the expensive communication if
                 // the previous workgroup has published its prefix!
                 if(tid == 0) {
                     // publishing the prefix, reset accumulator
                     prefix.val = incprefix[WG_ID-1];
-                    prefix.flg = incp_flgs[WG_ID-1];                    
+                    prefix.flg = getUsed(stat1);                    
                 }
             } else {
                 int32_t read_offset = WG_ID - WARP;
@@ -623,15 +623,17 @@ __kernel void singlePassSgmScanKer (
                     uint8_t stat = STATUS_X;
                     uint8_t used = 0;
                     if (read_i >= 0) {
-                        stat = statusflgs[read_i];
+                        uint8_t flg_stat = statusflgs[read_i];
+                        stat = getStatus(flg_stat);
+                        flag = getUsed(flg_stat);
                         if (stat == STATUS_P) {
                             aggr = incprefix[read_i];
-                            flag = incp_flgs[read_i];
+                            //flag = incp_flgs[read_i];
                         } else if (stat == STATUS_A) {
                             aggr = aggregates[read_i];
-                            flag = aggr_flgs[read_i];
+                            //flag = aggr_flgs[read_i];
                             used = 1;
-                        }
+                        } else { flag = 0; }
                     }
                     // init local data for warp-reduce
                     exchflgs[tid] = flag;
@@ -640,42 +642,39 @@ __kernel void singlePassSgmScanKer (
                     if(warpscan[WARP-1] != STATUS_P)
                         incSpecialSgmScanWarp(exchange, warpscan, exchflgs, tid);
 
-                    if ( tid == 0 ) {
-                        { // update prefix 
-                            FlgTuple aggr; 
-                            aggr.flg = exchflgs[WARP-1];
-                            aggr.val = exchange[WARP-1];
-                            prefix = binOpFlg(aggr, prefix);
-                        }
-                        { // update read_offset and publish it
-                            uint8_t usedflg_val = warpscan[WARP-1];
-                            stat = getStatus(usedflg_val);
-                            if (stat == STATUS_P) { // LOOP WILL EXIT
-                                // publish exit condition
-                                read_offset = LOOP_STOP;
-                            } else {
-                                used = getUsed  (usedflg_val);
-                                read_offset = read_offset - used;
-                            }
-                            block_id[0] = read_offset;
+                    { // update read_offset
+                        uint8_t usedflg_val = warpscan[WARP-1];
+                        stat = getStatus(usedflg_val);
+                        if (stat == STATUS_P) { // LOOP WILL EXIT
+                            // publish exit condition
+                            read_offset = LOOP_STOP;
+                        } else {
+                            used = getUsed  (usedflg_val);
+                            read_offset = read_offset - used;
                         }
                     }
-                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
-                    read_offset = block_id[0];
+                    if ( tid == 0 ) {
+                        // update prefix 
+                        FlgTuple aggr; 
+                        aggr.flg = exchflgs[WARP-1];
+                        aggr.val = exchange[WARP-1];
+                        prefix = binOpFlg(aggr, prefix);
+                    }
                 } // end WHILE loop
             } // end ELSE branch of IF(stat1 == STATUS_P)
             if(tid == 0) {
                 // publish full prefix and status for next workgroups
                 acc = binOpFlg(prefix, acc);
                 incprefix[WG_ID] = acc.val;
-                incp_flgs[WG_ID] = acc.flg;
+                //incp_flgs[WG_ID] = acc.flg;
+                if (acc.flg > 0) { acc.flg = 1; }
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[WG_ID] = STATUS_P;
+                statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_P);
+                // reset acc
+                acc.flg = 0; acc.val = NE;
                 // publish current prefix for the threads in this workgroup
                 exchflgs[0] = prefix.flg;
                 exchange[0] = prefix.val;
-                // reset acc
-                acc.flg = 0; acc.val = NE;
             }
         } // END IF( (WG_ID != 0) && (tid < WARP) )
      
