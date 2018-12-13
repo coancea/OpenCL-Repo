@@ -16,7 +16,6 @@ struct OclKernels {
 struct OclBuffers {
     // constants
     uint32_t N;
-    uint32_t num_blocks_paded;
 
     // main input and result arrays (global memory)
     cl_mem  gpu_inp;
@@ -29,15 +28,6 @@ struct OclBuffers {
     cl_mem  incprefix;
     cl_mem  statusflgs; // includes the flags of aggregates and incprefix
 };
-
-#if 0
-struct CpuArrays {
-    // these are all arrays allocated in host (CPU) space 
-    int32_t* cpu_inp;    // the input
-    int32_t* cpu_ref;    // the (golden) result computed on CPU
-    int32_t* cpu_out;    // the result computed and transfered from GPU
-};
-#endif
 
 //CpuArrays  arrs;
 OclControl ctrl;
@@ -52,12 +42,6 @@ int32_t getNumElemPerThread() {
 inline size_t getNumBlocks(const uint32_t N) {
     const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread();
     return (N + numelems_group - 1) / numelems_group;
-}
-
-uint32_t getNumBlocksPadWarp(uint32_t num_blocks, uint32_t num_bytes) {
-    bool is_exact = (num_bytes > 0) && (((4*WARP) % num_bytes) == 0);
-    uint32_t tau = (WARP*4) / num_bytes;
-    return is_exact ? ( (num_blocks + tau - 1) / tau ) * tau : num_blocks;
 }
 
 void initOclControl() {
@@ -79,9 +63,8 @@ void initOclBuffers(const uint32_t N, bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_i
     size_t size;
 
     // constants
-    size_t  num_blocks = getNumBlocks(N);
+    size_t num_blocks = getNumBlocks(N);
     buffs.N = N;
-    buffs.num_blocks_paded = getNumBlocksPadWarp(num_blocks, 1);
 
     // global-memory input buffer
     size = N*sizeof(ElTp);
@@ -113,8 +96,7 @@ void initOclBuffers(const uint32_t N, bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_i
         ciErr |= ciErr2; oclCheckError(ciErr, CL_SUCCESS);
 
         // allocate contiguous `status flags`, and the flags of `aggregate` and `incprefix`
-        
-        size = (is_sgm) ? 3 * buffs.num_blocks_paded : buffs.num_blocks_paded;
+        size = num_blocks * sizeof(uint8_t);
         buffs.statusflgs = clCreateBuffer(ctrl.cxGPUContext, CL_MEM_READ_WRITE, size, NULL, &ciErr2 );
         ciErr |= ciErr2; oclCheckError(ciErr, CL_SUCCESS);
     }
@@ -133,7 +115,6 @@ void initKernels(const bool is_sgm) {
 
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(uint32_t), (void *)&buffs.N);
         if (is_sgm) {
-            ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(uint32_t), (void *)&buffs.num_blocks_paded);
             ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(cl_mem), (void*)&buffs.gpu_flg); // global flags
         }
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(cl_mem), (void*)&buffs.gpu_inp); // global input
@@ -147,8 +128,7 @@ void initKernels(const bool is_sgm) {
         oclCheckError(ciErr, CL_SUCCESS);
 
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(int32_t), NULL); // __local block_id
-        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG * sizeof(ElTp), NULL); // local memory for elements
-//        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, WARP, NULL); // __local warpscan: encodes both number of used and status flags.
+        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG * sizeof(ElTp), NULL); // __local exchange
         oclCheckError(ciErr, CL_SUCCESS);
     }
 

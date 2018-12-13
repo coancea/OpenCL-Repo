@@ -480,7 +480,6 @@ __kernel void singlePassScanKer (
  
 __kernel void singlePassSgmScanKer ( 
         uint32_t            N,
-        uint32_t            num_blocks_pad,
         __global uint8_t*   d_flg,      // read-only,  [N]
         __global ElTp*      d_inp,      // read-only,  [N]
         __global ElTp*      d_out,      // write-only, [N]
@@ -492,8 +491,6 @@ __kernel void singlePassSgmScanKer (
         __local  ElTp*    exchange
 ) { 
     const size_t  tid = get_local_id(0);
-    //volatile __global uint8_t* aggr_flgs = statusflgs + num_blocks_pad;
-    //volatile __global uint8_t* incp_flgs = aggr_flgs  + num_blocks_pad;
 
     if (tid == 0) {
         int32_t id  = atomic_add(&global_id[0], 1);
@@ -581,8 +578,7 @@ __kernel void singlePassSgmScanKer (
         volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
         if ( (WG_ID == 0) && (tid == 0) ) { // first workgroup, first thread
             incprefix[WG_ID] = acc.val;
-            //incp_flgs[WG_ID] = acc.flg;
-            if (acc.flg > 0) { acc.flg = 1; } // COSMIN
+            if (acc.flg > 0) { acc.flg = 1; }
             mem_fence(CLK_GLOBAL_MEM_FENCE);
             statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_P);
             // reset accumulator
@@ -593,7 +589,6 @@ __kernel void singlePassSgmScanKer (
             if ( tid == 0 ) { // first thread
                 // record this workgroup status a.s.a.p.
                 aggregates[WG_ID] = acc.val;
-                //aggr_flgs[WG_ID]  = acc.flg;
                 if (acc.flg > 0) { acc.flg = 1; } // COSMIN
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_A);
@@ -628,10 +623,8 @@ __kernel void singlePassSgmScanKer (
                         flag = getUsed(flg_stat);
                         if (stat == STATUS_P) {
                             aggr = incprefix[read_i];
-                            //flag = incp_flgs[read_i];
                         } else if (stat == STATUS_A) {
                             aggr = aggregates[read_i];
-                            //flag = aggr_flgs[read_i];
                             used = 1;
                         } else { flag = 0; }
                     }
@@ -666,7 +659,6 @@ __kernel void singlePassSgmScanKer (
                 // publish full prefix and status for next workgroups
                 acc = binOpFlg(prefix, acc);
                 incprefix[WG_ID] = acc.val;
-                //incp_flgs[WG_ID] = acc.flg;
                 if (acc.flg > 0) { acc.flg = 1; }
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_P);
