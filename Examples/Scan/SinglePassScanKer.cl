@@ -373,11 +373,10 @@ __kernel void singlePassScanKer (
             acc = NE;
         }
         if ( (WG_ID != 0) && (tid < WARP) ) { // WG_ID != 0, first warp, all lanes
-            __local uint8_t *restrict warpscan = (__local uint8_t*)(exchange+WARP);
-            const int32_t lane = tid;
-            // parallel lookback in last warp
-
+            volatile __local uint8_t *restrict warpscan = (volatile __local uint8_t*)(exchange+WARP);
+            
             if ( tid == 0 ) { // first lane
+                // publish the partial result a.s.a.p.
                 aggregates[WG_ID] = acc;
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[WG_ID] = STATUS_A;
@@ -390,16 +389,15 @@ __kernel void singlePassScanKer (
                 // do not enter the expensive communication if
                 // the previous workgroup has published its prefix!
                 if(tid == 0) {
-                    exchange[0] = incprefix[WG_ID-1];
-                    acc = NE;
+                    prefix = incprefix[WG_ID-1];
                 }
             } else {
                 int32_t read_offset = WG_ID - WARP;
-                int32_t LOOP_STOP = -100;
+                int32_t LOOP_STOP = -WARP;
 
 	            // look at WARP previous blocks at a time until
                 // the whole prefix of this workgroup is computed
-                while (read_offset != LOOP_STOP) {
+                while (read_offset > LOOP_STOP) {
                     int32_t read_i = read_offset + tid;
 
                     // Read WARP flag/aggregate values in local memory
@@ -417,37 +415,40 @@ __kernel void singlePassScanKer (
                     }
                     exchange[tid]       = aggr;
                     warpscan[tid]       = mkStatusUsed(used, flag);
-
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
                     // perform reduce
                     if(warpscan[WARP-1] != STATUS_P)
                         incSpecialScanWarp(exchange, warpscan, tid);
-                    
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
                     if ( tid == 0 ) {
-                        // update prefix with the current contribution
-                        aggr = exchange[WARP-1];
-                        prefix = binOp(aggr, prefix);
-
                         // read result from local data after warp reduce
                         uint8_t usedflg_val = warpscan[WARP-1];
                         flag = getStatus(usedflg_val);
                         if (flag == STATUS_P) { // LOOP WILL BE EXITED
-                            block_id[0] = LOOP_STOP;
-                            // publish the prefix of the current workgroup
-                            incprefix[WG_ID] = binOp(prefix, acc);
-                            mem_fence(CLK_GLOBAL_MEM_FENCE);
-                            statusflgs[WG_ID] = STATUS_P;
-                            // publish prefix for all work items and update acc
-                            exchange[0] = prefix;
-                            acc = NE;
+                            read_offset = LOOP_STOP;
                         } else { // LOOP WILL CARRY ON
                             used = getUsed  (usedflg_val);
-                            block_id[0] = read_offset - used;
+                            read_offset = read_offset - used;
                         }
+                        block_id[0] = read_offset;
+
+                        // update prefix with the current contribution
+                        aggr = exchange[WARP-1];
+                        prefix = binOp(aggr, prefix);
                     }
                     mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
                     read_offset = block_id[0];
-                }
-            } // end WHILE loop
+                } // END WHILE loop
+            } // END ELSE branch of if (stat1 == STATUS_P)
+            if(tid == 0) {
+                // publish the prefix of the current workgroup
+                incprefix[WG_ID] = binOp(prefix, acc);
+                mem_fence(CLK_GLOBAL_MEM_FENCE);
+                statusflgs[WG_ID] = STATUS_P;
+                // publish prefix for all work items and update acc
+                exchange[0] = prefix;
+                acc = NE;
+            }
         } // end IF(WG_ID != 0) && (tid < WARP)
 
         if (WG_ID != 0)  {
@@ -467,10 +468,10 @@ __kernel void singlePassScanKer (
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
+        const uint32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
         #pragma unroll
         for (int32_t i = 0; i < ELEMS_PER_THREAD; i++) {
-            int32_t gind = block_offset + i * get_local_size(0) + tid;
+            uint32_t gind = block_offset + i * get_local_size(0) + tid;
             if (gind < N) {
                 d_out[gind] = exchange[gind - block_offset];
             }
@@ -607,9 +608,8 @@ __kernel void singlePassSgmScanKer (
                 // the previous workgroup has published its prefix!
                 if(tid == 0) {
                     // publishing the prefix, reset accumulator
-                    exchange[0] = incprefix[WG_ID-1];
-                    exchflgs[0] = incp_flgs[WG_ID-1];                    
-                    acc.flg = 0; acc.val = NE;
+                    prefix.val = incprefix[WG_ID-1];
+                    prefix.flg = incp_flgs[WG_ID-1];                    
                 }
             } else {
                 int32_t read_offset = WG_ID - WARP;
@@ -641,41 +641,43 @@ __kernel void singlePassSgmScanKer (
                         incSpecialSgmScanWarp(exchange, warpscan, exchflgs, tid);
 
                     if ( tid == 0 ) {
-                        { // update prefix
+                        { // update prefix 
                             FlgTuple aggr; 
                             aggr.flg = exchflgs[WARP-1];
                             aggr.val = exchange[WARP-1];
                             prefix = binOpFlg(aggr, prefix);
                         }
-
                         { // update read_offset and publish it
                             uint8_t usedflg_val = warpscan[WARP-1];
                             stat = getStatus(usedflg_val);
                             if (stat == STATUS_P) { // LOOP WILL EXIT
                                 // publish exit condition
-                                block_id[0] = LOOP_STOP;
-                                // publish full prefix and status for next workgroups
-                                acc = binOpFlg(prefix, acc);
-                                incprefix[WG_ID] = acc.val;
-                                incp_flgs[WG_ID] = acc.flg;
-                                mem_fence(CLK_GLOBAL_MEM_FENCE);
-                                statusflgs[WG_ID] = STATUS_P;
-                                // publish current prefix for the threads in this workgroup
-                                exchflgs[0] = prefix.flg;
-                                exchange[0] = prefix.val;
-                                // reset acc
-                                acc.flg = 0; acc.val = NE;
+                                read_offset = LOOP_STOP;
                             } else {
                                 used = getUsed  (usedflg_val);
-                                block_id[0] = read_offset - used;
+                                read_offset = read_offset - used;
                             }
+                            block_id[0] = read_offset;
                         }
                     }
                     mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
                     read_offset = block_id[0];
-                }
+                } // end WHILE loop
+            } // end ELSE branch of IF(stat1 == STATUS_P)
+            if(tid == 0) {
+                // publish full prefix and status for next workgroups
+                acc = binOpFlg(prefix, acc);
+                incprefix[WG_ID] = acc.val;
+                incp_flgs[WG_ID] = acc.flg;
+                mem_fence(CLK_GLOBAL_MEM_FENCE);
+                statusflgs[WG_ID] = STATUS_P;
+                // publish current prefix for the threads in this workgroup
+                exchflgs[0] = prefix.flg;
+                exchange[0] = prefix.val;
+                // reset acc
+                acc.flg = 0; acc.val = NE;
             }
-        }
+        } // END IF( (WG_ID != 0) && (tid < WARP) )
      
         if (WG_ID != 0) {
             barrier(CLK_LOCAL_MEM_FENCE);
@@ -695,10 +697,10 @@ __kernel void singlePassSgmScanKer (
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+        const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (int32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
-            int32_t gind = block_offset + i*get_local_size(0) + tid;
+            uint32_t gind = block_offset + i*get_local_size(0) + tid;
             if (gind < N) {
                 d_out[gind] = exchange[gind - block_offset];
             }
