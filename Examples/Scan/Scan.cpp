@@ -1,6 +1,6 @@
 #include "../utils/Util.h"
 
-#define REPEAT              20
+#define REPEAT              200
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"

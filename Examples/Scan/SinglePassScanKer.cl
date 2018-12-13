@@ -241,7 +241,7 @@ incScanGroup1 ( __local volatile ElTp*   sh_data, const size_t tid) {
 }
 
 inline void 
-incSgmScanGroup0( __local volatile uint8_t* sh_flag
+incSgmScanGroup ( __local volatile uint8_t* sh_flag
                 , __local volatile ElTp*    sh_data
                 , const size_t th_id
 ) {
@@ -264,7 +264,7 @@ incSgmScanGroup0( __local volatile uint8_t* sh_flag
 }
 
 inline void 
-incSgmScanGroup ( __local volatile uint8_t* sh_flag
+incSgmScanGroup0( __local volatile uint8_t* sh_flag
                 , __local volatile ElTp*    sh_data
                 , const size_t tid
 ) {
@@ -476,7 +476,6 @@ __kernel void singlePassScanKer (
         }
     }
 }
-
  
 __kernel void singlePassSgmScanKer ( 
         uint32_t            N,
@@ -507,10 +506,11 @@ __kernel void singlePassSgmScanKer (
     barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
 
     const int32_t WG_ID = block_id[0];
+    const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+    uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
 
     FlgTuple chunk[SGM_ELEMS_PER_THREAD];
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
-        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
@@ -518,8 +518,6 @@ __kernel void singlePassSgmScanKer (
             exchange[gind - block_offset] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-
-        uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             chunk[i].val = exchange[loc_offset+i];
@@ -527,21 +525,20 @@ __kernel void singlePassSgmScanKer (
         barrier(CLK_LOCAL_MEM_FENCE);
     }
  
-    { // Coalesced read from global-input 'flags' into register 'chunk_flgs' by means of shared memory
-        __local  uint8_t* restrict exchflgs = (__local  uint8_t*) exchange;
-        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+    { // Coalesced read from global-input 'flags' into register 'chunk_flgs'
+      // by means of shared memory. For performance reasons, work with `uint32_t`
+      // rather than `uint8_t` in local memory, in order to reduce conflicts.
+        volatile __local uint32_t* restrict exchflgs = (__local  uint32_t*) exchange;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
             uint8_t v = (gind < N) ? d_flg[gind] : 0;
-            exchflgs[i*get_local_size(0) + tid] = v;
+            exchflgs[gind - block_offset] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-
-        uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
-            chunk[i].flg = exchflgs[loc_offset+i];
+            chunk[i].flg = (uint8_t)exchflgs[loc_offset+i];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
@@ -574,7 +571,7 @@ __kernel void singlePassSgmScanKer (
     { prefix.flg = 0; prefix.val = NE; }
 
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF WARP!)
-    {
+    { 
         volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
         if ( (WG_ID == 0) && (tid == 0) ) { // first workgroup, first thread
             incprefix[WG_ID] = acc.val;
