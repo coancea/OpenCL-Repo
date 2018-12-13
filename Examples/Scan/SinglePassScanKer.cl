@@ -2,7 +2,7 @@ typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
 
-#include "GenericHack.h"
+#include "GenericHack.h" 
 
 __kernel void memcpy_wflags ( 
         uint32_t            N,
@@ -59,7 +59,6 @@ inline uint8_t mkStatusUsed(uint8_t usd, uint8_t flg) { return (usd << 2) + flg;
 //     return (flag2, value2, used2)
 // return (flag1, operator(value1, value2), used1+used2)
 
-#if 1
 inline void
 binOpInLocMem( __local volatile ElTp*    sh_data
              , __local volatile uint8_t* sh_status
@@ -82,25 +81,6 @@ binOpInLocMem( __local volatile ElTp*    sh_data
     sh_status[cur_th] = mkStatusUsed(usd1, stat1);
     sh_data[cur_th] = binOp(agg1, agg2);
 }
-#else
-inline void
-binOpInLocMem( __local volatile ElTp*    sh_data
-             , __local volatile uint8_t* sh_status
-             , const size_t acc_th,  const size_t cur_th
-) {
-    ElTp    agg1  = sh_data[acc_th];
-    ElTp    agg2  = sh_data[cur_th];
-    uint8_t stat1 = sh_status[acc_th];
-    uint8_t stat2 = sh_status[cur_th];
-    if (stat2 != STATUS_A) {
-        agg1 = NE;
-        stat1 = stat2;
-    }
-    sh_status[cur_th] = stat1;
-    sh_data  [cur_th] = binOp(agg1, agg2);
-}
-#endif
-
 
 inline void
 flgBinOpInLocMem( __local volatile ElTp*    sh_data
@@ -222,7 +202,7 @@ incSgmScanWarp  ( __local volatile uint8_t* sh_flag
 }
 
 inline void 
-incScanGroup( __local volatile ElTp* sh_data, const size_t th_id) {
+incScanGroup ( __local volatile ElTp* sh_data, const size_t th_id) {
     ElTp res;
     #pragma unroll
     for(uint32_t i=0; i<logWORKGROUP_SIZE; i++) {
@@ -235,7 +215,7 @@ incScanGroup( __local volatile ElTp* sh_data, const size_t th_id) {
 }  
  
 inline void 
-incScanGroup0( __local volatile ElTp*   sh_data, const size_t tid) {
+incScanGroup1 ( __local volatile ElTp*   sh_data, const size_t tid) {
     const size_t lane   = tid & (WARP-1);
     const size_t warpid = tid >> lgWARP;
 
@@ -258,10 +238,9 @@ incScanGroup0( __local volatile ElTp*   sh_data, const size_t tid) {
     barrier(CLK_LOCAL_MEM_FENCE);
     sh_data[tid] = res;
     barrier(CLK_LOCAL_MEM_FENCE);
-    // result is returned directly; share memory does not contain it!
 }
 
-inline FlgTuple 
+inline void 
 incSgmScanGroup0( __local volatile uint8_t* sh_flag
                 , __local volatile ElTp*    sh_data
                 , const size_t th_id
@@ -282,10 +261,9 @@ incSgmScanGroup0( __local volatile uint8_t* sh_flag
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    return inp;
 }
 
-inline FlgTuple 
+inline void 
 incSgmScanGroup ( __local volatile uint8_t* sh_flag
                 , __local volatile ElTp*    sh_data
                 , const size_t tid
@@ -316,10 +294,8 @@ incSgmScanGroup ( __local volatile uint8_t* sh_flag
     sh_flag[tid] = res.flg;
     sh_data[tid] = res.val;
     barrier(CLK_LOCAL_MEM_FENCE);
-    // result is returned directly; share memory does not contain it!
-    return res;
 }  
- 
+
 __kernel void singlePassScanKer ( 
         uint32_t            N,
         __global ElTp*      d_inp,      // read-only,  [N]
@@ -328,10 +304,9 @@ __kernel void singlePassScanKer (
         volatile __global ElTp*      aggregates, // read-write, [num_groups]
         volatile __global ElTp*      incprefix,  // read-write, [num_groups]
         volatile __global uint8_t*   statusflgs, // read-write, [num_groups]
-        volatile __local  int32_t*   block_id,
-        volatile __local  ElTp*      exchange
-//      , __local uint8_t*    warpscan
-) { 
+        volatile __local  int32_t* restrict  block_id,
+        volatile __local  ElTp* restrict     exchange
+) {
     const int32_t tid = get_local_id(0);
 
     if (tid == 0) {
@@ -340,7 +315,7 @@ __kernel void singlePassScanKer (
         block_id[0] = id;
 
         // last block resets the global_id index!
-        int32_t elem_per_group = get_local_size(0)*ELEMS_PER_THREAD;
+        int32_t elem_per_group = get_local_size(0) * ELEMS_PER_THREAD;
         int32_t last_block = (N + elem_per_group - 1) / elem_per_group - 1;
         if(id == last_block) {
             global_id[0] = 0;
@@ -348,16 +323,16 @@ __kernel void singlePassScanKer (
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    const int32_t id   = block_id[0];
+    const int32_t WG_ID = block_id[0];
 
     ElTp  chunk[ELEMS_PER_THREAD];
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
-        const int32_t block_offset = id * get_local_size(0) * ELEMS_PER_THREAD;
+        const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
             ElTp v = (gind < N) ? d_inp[gind] : NE;
-            exchange[i*get_local_size(0) + tid] = v;
+            exchange[gind - block_offset] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -381,44 +356,53 @@ __kernel void singlePassScanKer (
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    // Per-Group Scan
-    incScanGroup(exchange, tid);
-    int32_t ind;
-    if(tid == 0) { ind = get_local_size(0)-1; } else { ind = tid-1; }
-    acc = exchange[ind];
-    barrier(CLK_LOCAL_MEM_FENCE);
+    { // Per-Group Scan, then store in local memory
+        incScanGroup(exchange, tid);
+        int32_t prev_ind = (tid == 0) ? (get_local_size(0) - 1) : (tid - 1);
+        acc = exchange[prev_ind];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
 
     ElTp prefix = NE;
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
     {
-        if ( (id == 0) && (tid == 0) ) { // id 0, first warp, first lane
-            incprefix[id] = acc;
+        if ( (WG_ID == 0) && (tid == 0) ) { // first group, first warp, first lane
+            incprefix[WG_ID] = acc;
             mem_fence(CLK_GLOBAL_MEM_FENCE);
-            statusflgs[id] = STATUS_P;
+            statusflgs[WG_ID] = STATUS_P;
             acc = NE;
-        } else if ( (id != 0) && (tid < WARP) ) { // id != 0, first warp, all lanes
-            const int32_t lane = tid & (WARP-1);
+        }
+        if ( (WG_ID != 0) && (tid < WARP) ) { // WG_ID != 0, first warp, all lanes
+            __local uint8_t *restrict warpscan = (__local uint8_t*)(exchange+WARP);
+            const int32_t lane = tid;
             // parallel lookback in last warp
 
-            if ( lane == 0 ) { // first lane
-                aggregates[id] = acc;
+            if ( tid == 0 ) { // first lane
+                aggregates[WG_ID] = acc;
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[id] = STATUS_A;
+                statusflgs[WG_ID] = STATUS_A;
+                warpscan[0] = statusflgs[WG_ID-1];
             }
-            uint8_t stat1 = statusflgs[id-1];
+            mem_fence(CLK_LOCAL_MEM_FENCE); 
+            uint8_t stat1 = warpscan[0];
 	        if (stat1 == STATUS_P) {
-                if(lane==0) prefix = incprefix[id-1];
-            } else 
-	    {
-#if 1
-                int32_t read_offset = id - WARP;
+                // important performance optimization:
+                // do not enter the expensive communication if
+                // the previous workgroup has published its prefix!
+                if(tid == 0) {
+                    exchange[0] = incprefix[WG_ID-1];
+                    acc = NE;
+                }
+            } else {
+                int32_t read_offset = WG_ID - WARP;
                 int32_t LOOP_STOP = -100;
-                __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
-	        
-                while (read_offset != LOOP_STOP) {
-                    int32_t read_i = read_offset + lane;
 
-                    // Read WARP flag/aggregate values in the warp
+	            // look at WARP previous blocks at a time until
+                // the whole prefix of this workgroup is computed
+                while (read_offset != LOOP_STOP) {
+                    int32_t read_i = read_offset + tid;
+
+                    // Read WARP flag/aggregate values in local memory
                     ElTp    aggr = NE;
                     uint8_t flag = STATUS_X;
                     uint8_t used = 0;
@@ -431,70 +415,47 @@ __kernel void singlePassScanKer (
                             used = 1;
                         }
                     }
-                    // init local data for warp-reduce
-                    exchange[lane]       = aggr;
-                    warpscan[lane]       = mkStatusUsed(used, flag);
-		    if(warpscan[WARP-1] != STATUS_P)
-                        incSpecialScanWarp(exchange, warpscan, lane);
+                    exchange[tid]       = aggr;
+                    warpscan[tid]       = mkStatusUsed(used, flag);
 
-                    if ( lane == 0 ) {
+                    // perform reduce
+                    if(warpscan[WARP-1] != STATUS_P)
+                        incSpecialScanWarp(exchange, warpscan, tid);
+                    
+                    if ( tid == 0 ) {
+                        // update prefix with the current contribution
+                        aggr = exchange[WARP-1];
+                        prefix = binOp(aggr, prefix);
+
                         // read result from local data after warp reduce
                         uint8_t usedflg_val = warpscan[WARP-1];
-                        used = getUsed  (usedflg_val);
                         flag = getStatus(usedflg_val);
-                        aggr = exchange[WARP-1];
-
-                        prefix = binOp(aggr, prefix);
-                        read_offset -= used;
-                        if (flag == STATUS_P)
-                            read_offset = LOOP_STOP;
-                        block_id[0] = read_offset;
-                    }
-                    //mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
-                    read_offset = block_id[0];
-                }
-#else
-		// COSMIN
-                volatile __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
-                int32_t read_i = id - WARP + lane;
-                bool goOn = true;
-                while (goOn) {
-                    ElTp    aggr = NE;
-                    uint8_t flag = STATUS_X;
-                    if (read_i >= 0) {
-                        flag = statusflgs[read_i];
-                        if (flag == STATUS_P) {
-                            aggr = incprefix[read_i];
-                        } else if (flag == STATUS_A) {
-                            aggr = aggregates[read_i];
+                        if (flag == STATUS_P) { // LOOP WILL BE EXITED
+                            block_id[0] = LOOP_STOP;
+                            // publish the prefix of the current workgroup
+                            incprefix[WG_ID] = binOp(prefix, acc);
+                            mem_fence(CLK_GLOBAL_MEM_FENCE);
+                            statusflgs[WG_ID] = STATUS_P;
+                            // publish prefix for all work items and update acc
+                            exchange[0] = prefix;
+                            acc = NE;
+                        } else { // LOOP WILL CARRY ON
+                            used = getUsed  (usedflg_val);
+                            block_id[0] = read_offset - used;
                         }
                     }
-                    // init local data for warp-reduce
-                    exchange[lane]       = aggr;
-                    warpscan[lane]       = flag;
-
-		    if(warpscan[WARP-1] != STATUS_P) {
-                        incSpecialScanWarp(exchange, warpscan, lane);
-                    }
-                    //mem_fence(CLK_LOCAL_MEM_FENCE);
-                    goOn = (warpscan[WARP-1] != STATUS_P);
+                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
+                    read_offset = block_id[0];
                 }
-                if (lane==0) prefix = exchange[WARP-1];
-#endif
-            }
-            if (lane == 0) { 
-                // publish prefix an status for next workgroups
-                incprefix[id] = binOp(prefix, acc);
-                mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[id] = STATUS_P;
-                // publish current prefix for the threads in the current workgroup
-                exchange[0] = prefix;
-                acc = NE;
-            }
+            } // end WHILE loop
+        } // end IF(WG_ID != 0) && (tid < WARP)
+
+        if (WG_ID != 0)  {
+            // all workgroup threads read the prefix
+            barrier(CLK_LOCAL_MEM_FENCE);
+            prefix = exchange[0];
+            barrier(CLK_LOCAL_MEM_FENCE);
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        if (id != 0) prefix = exchange[0];
-        barrier(CLK_LOCAL_MEM_FENCE);
     }
 
     { // finally read and add prefix to every element in this workgroup
@@ -506,10 +467,10 @@ __kernel void singlePassScanKer (
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        const int32_t block_offset = id * get_local_size(0) * ELEMS_PER_THREAD;
+        const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
         #pragma unroll
         for (int32_t i = 0; i < ELEMS_PER_THREAD; i++) {
-            int32_t gind = block_offset + i*get_local_size(0) + tid;
+            int32_t gind = block_offset + i * get_local_size(0) + tid;
             if (gind < N) {
                 d_out[gind] = exchange[gind - block_offset];
             }
@@ -517,8 +478,7 @@ __kernel void singlePassScanKer (
     }
 }
 
-
-
+ 
 __kernel void singlePassSgmScanKer ( 
         uint32_t            N,
         uint32_t            num_blocks_pad,
@@ -529,14 +489,10 @@ __kernel void singlePassSgmScanKer (
         volatile __global ElTp*      aggregates, // read-write, [num_groups]
         volatile __global ElTp*      incprefix,  // read-write, [num_groups]
         volatile __global uint8_t*   statusflgs, // read-write, [num_groups]
-        __local  int32_t*   block_id,
-        __local  uint8_t*   exchflgs,
-        __local  ElTp*      exchange
-//      , __local  uint8_t*   warpscan
+        __local  int32_t* block_id,
+        __local  ElTp*    exchange
 ) { 
-    const size_t tid = get_local_id(0);
-    const int32_t lane = tid & (WARP-1);
-
+    const size_t  tid = get_local_id(0);
     volatile __global uint8_t* aggr_flgs = statusflgs + num_blocks_pad;
     volatile __global uint8_t* incp_flgs = aggr_flgs  + num_blocks_pad;
 
@@ -554,16 +510,16 @@ __kernel void singlePassSgmScanKer (
     }
     barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
 
-    const int32_t id   = block_id[0];
+    const int32_t WG_ID = block_id[0];
 
     FlgTuple chunk[SGM_ELEMS_PER_THREAD];
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
-        const int32_t block_offset = id * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
             ElTp v = (gind < N) ? d_inp[gind] : NE;
-            exchange[i*get_local_size(0) + tid] = v;
+            exchange[gind - block_offset] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -574,9 +530,10 @@ __kernel void singlePassSgmScanKer (
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-
+ 
     { // Coalesced read from global-input 'flags' into register 'chunk_flgs' by means of shared memory
-        const int32_t block_offset = id * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+        __local  uint8_t* restrict exchflgs = (__local  uint8_t*) exchange;
+        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
@@ -593,119 +550,144 @@ __kernel void singlePassSgmScanKer (
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    // Per-Thread scan
     FlgTuple acc = chunk[0];
-    #pragma unroll
-    for (uint32_t i = 1; i < SGM_ELEMS_PER_THREAD; i++) {            
-        acc = binOpFlg(acc, chunk[i]);
-        chunk[i] = acc;
+    { // Per-Thread scan, then store in local memory
+        #pragma unroll
+        for (uint32_t i = 1; i < SGM_ELEMS_PER_THREAD; i++) {            
+            acc = binOpFlg(acc, chunk[i]);
+            chunk[i] = acc;
+        }
     }
-    exchflgs[tid] = acc.flg;
-    exchange[tid] = acc.val;
-    barrier(CLK_LOCAL_MEM_FENCE);
 
-    // Per-Group Scan
-    acc = incSgmScanGroup(exchflgs, exchange, tid);
-    FlgTuple prev_acc;
-    if(tid == 0) {
-        prev_acc.flg = 0;
-        prev_acc.val = NE; 
-    } else { 
-        prev_acc.flg = exchflgs[tid-1];
-        prev_acc.val = exchange[tid-1];
+    // Per-Group Scan, then load the result
+    {
+        volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
+        exchflgs[tid] = acc.flg;
+        exchange[tid] = acc.val;
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+        incSgmScanGroup(exchflgs, exchange, tid);
+
+        int32_t prev_ind = (tid == 0) ? (get_local_size(0)-1) : (tid-1);
+        acc.flg = exchflgs[prev_ind];
+        acc.val = exchange[prev_ind];
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
 
     FlgTuple prefix;
     { prefix.flg = 0; prefix.val = NE; }
 
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF WARP!)
     {
-        if ( (id == 0) && (tid == get_local_size(0)-1) ) { // id 0, last warp, last lane
-            incprefix[id] = acc.val;
-            incp_flgs[id] = acc.flg;
+        volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
+        if ( (WG_ID == 0) && (tid == 0) ) { // first workgroup, first thread
+            incprefix[WG_ID] = acc.val;
+            incp_flgs[WG_ID] = acc.flg;
             mem_fence(CLK_GLOBAL_MEM_FENCE);
-            statusflgs[id] = STATUS_P;
-        } else if ( (id != 0) && ( WARP >= (get_local_size(0)-tid) ) ) { // id != 0, last warp, all lanes
-            // parallel lookback in last warp
-            if ( lane == (WARP-1) ) { // last lane
-                aggregates[id] = acc.val;
-                aggr_flgs[id]  = acc.flg;
+            statusflgs[WG_ID] = STATUS_P;
+            // reset accumulator
+            acc.flg = 0; acc.val = NE;
+        } 
+        if ( (WG_ID != 0) && (tid < WARP) ) { // the other workgroups, first WARP
+            volatile __local  uint8_t* restrict warpscan = exchflgs + get_local_size(0);
+            if ( tid == 0 ) { // first thread
+                // record this workgroup status a.s.a.p.
+                aggregates[WG_ID] = acc.val;
+                aggr_flgs[WG_ID]  = acc.flg;
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[id] = STATUS_A;
+                statusflgs[WG_ID] = STATUS_A;
+                // read previous workgroup status for fasttrack opportunity
+                warpscan[0] = statusflgs[WG_ID-1];
             }
-            
-            int32_t read_offset = id - WARP;
-            int32_t LOOP_STOP = -100;
-            __local uint8_t* warpscan = (__local uint8_t*)(exchange+WARP);
-            while (read_offset != LOOP_STOP) {
-                int32_t read_i = read_offset + lane;
-
-                // Read WARP flag/aggregate values in the warp
-                ElTp    aggr = NE;
-                uint8_t flag = 0;
-                uint8_t stat = STATUS_X;
-                uint8_t used = 0;
-                if (read_i >= 0) {
-                    stat = statusflgs[read_i];
-                    if (stat == STATUS_P) {
-                        aggr = incprefix[read_i];
-                        flag = incp_flgs[read_i];
-                    } else if (stat == STATUS_A) {
-                        aggr = aggregates[read_i];
-                        flag = aggr_flgs[read_i];
-                        used = 1;
-                    }
+            mem_fence(CLK_LOCAL_MEM_FENCE); 
+            uint8_t stat1 = warpscan[0];
+	        if (stat1 == STATUS_P) {
+                // important performance optimization:
+                // do not enter the expensive communication if
+                // the previous workgroup has published its prefix!
+                if(tid == 0) {
+                    // publishing the prefix, reset accumulator
+                    exchange[0] = incprefix[WG_ID-1];
+                    exchflgs[0] = incp_flgs[WG_ID-1];                    
+                    acc.flg = 0; acc.val = NE;
                 }
-                // init local data for warp-reduce
-                exchflgs[lane]       = flag;
-                exchange[lane]       = aggr;
-                warpscan[lane]       = mkStatusUsed(used, stat);
-                incSpecialSgmScanWarp(exchange, warpscan, exchflgs, lane);
+            } else {
+                int32_t read_offset = WG_ID - WARP;
+                int32_t LOOP_STOP = -100;
+                while (read_offset != LOOP_STOP) {
+                    int32_t read_i = read_offset + tid;
 
-                if ( lane == (WARP-1) ) {
-                    { // update prefix
-                        FlgTuple aggr; aggr.flg = exchflgs[lane]; aggr.val = exchange[lane];
-                        prefix = binOpFlg(aggr, prefix);
+                    // Read WARP flag/aggregate values in the warp
+                    ElTp    aggr = NE;
+                    uint8_t flag = 0;
+                    uint8_t stat = STATUS_X;
+                    uint8_t used = 0;
+                    if (read_i >= 0) {
+                        stat = statusflgs[read_i];
+                        if (stat == STATUS_P) {
+                            aggr = incprefix[read_i];
+                            flag = incp_flgs[read_i];
+                        } else if (stat == STATUS_A) {
+                            aggr = aggregates[read_i];
+                            flag = aggr_flgs[read_i];
+                            used = 1;
+                        }
                     }
+                    // init local data for warp-reduce
+                    exchflgs[tid] = flag;
+                    exchange[tid] = aggr;
+                    warpscan[tid] = mkStatusUsed(used, stat);
+                    if(warpscan[WARP-1] != STATUS_P)
+                        incSpecialSgmScanWarp(exchange, warpscan, exchflgs, tid);
 
-                    { // update read_offset and publish it
-                        uint8_t usedflg_val = warpscan[lane];
-                        used = getUsed  (usedflg_val);
-                        stat = getStatus(usedflg_val);
-                        read_offset -= used;
-                        if (stat == STATUS_P)
-                            read_offset = LOOP_STOP;
-                        block_id[0] = read_offset;
+                    if ( tid == 0 ) {
+                        { // update prefix
+                            FlgTuple aggr; 
+                            aggr.flg = exchflgs[WARP-1];
+                            aggr.val = exchange[WARP-1];
+                            prefix = binOpFlg(aggr, prefix);
+                        }
+
+                        { // update read_offset and publish it
+                            uint8_t usedflg_val = warpscan[WARP-1];
+                            stat = getStatus(usedflg_val);
+                            if (stat == STATUS_P) { // LOOP WILL EXIT
+                                // publish exit condition
+                                block_id[0] = LOOP_STOP;
+                                // publish full prefix and status for next workgroups
+                                acc = binOpFlg(prefix, acc);
+                                incprefix[WG_ID] = acc.val;
+                                incp_flgs[WG_ID] = acc.flg;
+                                mem_fence(CLK_GLOBAL_MEM_FENCE);
+                                statusflgs[WG_ID] = STATUS_P;
+                                // publish current prefix for the threads in this workgroup
+                                exchflgs[0] = prefix.flg;
+                                exchange[0] = prefix.val;
+                                // reset acc
+                                acc.flg = 0; acc.val = NE;
+                            } else {
+                                used = getUsed  (usedflg_val);
+                                block_id[0] = read_offset - used;
+                            }
+                        }
                     }
+                    mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
+                    read_offset = block_id[0];
                 }
-                mem_fence(CLK_LOCAL_MEM_FENCE);   // WITHOUT THIS FENCE IT DEADLOCKS!!!
-                read_offset = block_id[0];
-            }
-
-            if (lane == (WARP-1)) { 
-                // publish prefix and status for next workgroups
-                acc = binOpFlg(prefix, acc);
-                incprefix[id] = acc.val;
-                incp_flgs[id] = acc.flg;
-                mem_fence(CLK_GLOBAL_MEM_FENCE);
-                statusflgs[id] = STATUS_P;
-                // publish current prefix for the threads in the current workgroup
-                exchflgs[0] = prefix.flg;
-                exchange[0] = prefix.val;
             }
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        if (id != 0) {
+     
+        if (WG_ID != 0) {
+            barrier(CLK_LOCAL_MEM_FENCE);
             prefix.flg = exchflgs[0];
             prefix.val = exchange[0];
+            barrier(CLK_LOCAL_MEM_FENCE);
         }
     }
 
     { // finally read and add prefix to every element in this workgroup
       // Coalesced write to global-output 'data' from register 'chunk' by means of shared memory
-        acc = binOpFlg(prefix, prev_acc);        
-        barrier(CLK_LOCAL_MEM_FENCE);
+        acc = binOpFlg(prefix, acc);
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             FlgTuple res = binOpFlg(acc, chunk[i]);
@@ -713,7 +695,7 @@ __kernel void singlePassSgmScanKer (
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        const int32_t block_offset = id * get_local_size(0) * SGM_ELEMS_PER_THREAD;
+        const int32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (int32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             int32_t gind = block_offset + i*get_local_size(0) + tid;

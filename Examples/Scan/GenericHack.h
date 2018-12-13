@@ -1,14 +1,14 @@
-typedef float     ElTp;
-//typedef int32_t     ElTp;
+//typedef float     ElTp;
+typedef int32_t     ElTp;
 #define NE          0
-#define EPS         0.001
+#define EPS         0.001 
 
 #define lgWARP              5
 #define WARP                (1<<lgWARP)
 
-#define logWORKGROUP_SIZE   8
+#define logWORKGROUP_SIZE   7
 //#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define WORKGROUP_SIZE      224
+#define WORKGROUP_SIZE      128//224
 
 typedef struct FlgTup {
     uint8_t flg;
@@ -27,6 +27,6 @@ inline FlgTuple binOpFlg(FlgTuple t1, FlgTuple t2) {
     return res;
 }
 
-inline ElTp spreadData(float r) { return (ElTp)r; }
-//inline ElTp spreadData(float r) { return (ElTp)(r * 20.0); }
+//inline ElTp spreadData(float r) { return (ElTp)r; }
+inline ElTp spreadData(float r) { return (ElTp)(r * 20.0); }
 

@@ -1,6 +1,6 @@
 #include "../utils/Util.h"
 
-#define REPEAT              200
+#define REPEAT              20
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"
@@ -56,7 +56,7 @@ void runMemCopy(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
  *    is stored in @buffs.gpu_out@ -- see SetupOpenCL.h file. 
  */
 void runSinglePassScan(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
-    const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread(is_sgm);
+    const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread();
     const uint32_t num_blocks     = (buffs.N + numelems_group - 1) / numelems_group;
     const size_t   localWorkSize  = WORKGROUP_SIZE;
     const size_t   globalWorkSize = num_blocks * localWorkSize;
@@ -110,7 +110,7 @@ void goldenScan (bool is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_flag
     struct timeval t_start, t_end, t_diff;
     gettimeofday(&t_start, NULL);
 
-    for(int r=0; r < 1/*REPEAT*/; r++) {
+    for(int r=0; r < 1; r++) {
       ElTp acc = NE;
       for(uint32_t i=0; i<N; i++) {
         if(is_sgm) {
@@ -126,10 +126,10 @@ void goldenScan (bool is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_flag
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
     elapsed = t_diff.tv_sec*1e6+t_diff.tv_usec;
-    fprintf(stdout, "Sequential golden scan runs in: %ld microseconds on CPU\n", elapsed/REPEAT);
+    fprintf(stdout, "Sequential golden scan runs in: %ld microseconds on CPU\n", elapsed);
 }
 
-void validate(const uint32_t N, ElTp* cpu_out, ElTp* gpu_out, int32_t eps_range) {
+void validate(const uint32_t N, ElTp* cpu_out, ElTp* gpu_out, uint32_t eps_range) {
     // every eps_range elems we will allow an EPS error to propagate
     float ok_error = ((N + eps_range - 1) / eps_range) * EPS; 
     bool success = true;
@@ -159,7 +159,7 @@ void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     gpuToCpuTransfer(N, cpu_out);
 
     // validate GPU result
-    validate(N, cpu_ref, cpu_out, 10000);
+    validate(N, cpu_ref, cpu_out, N/*10000*/);
 
     // run memcopy kernel
     runMemCopy(false, cpu_flg, cpu_inp);
@@ -183,7 +183,7 @@ void testSegmScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     gpuToCpuTransfer(N, cpu_out);
 
     // validate GPU result
-    validate(N, cpu_ref, cpu_out, 100000000);
+    validate(N, cpu_ref, cpu_out, N/*100000000*/);
 
     // run memcopy kernel
     runMemCopy(true, cpu_flg, cpu_inp);
@@ -193,7 +193,7 @@ void testSegmScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
 }
 
 int main() {
-    const uint32_t N = 100000000;
+    const uint32_t N = 100000000; 
 
     // allocate and CPU arrays and initialize   
     ElTp* cpu_inp = (ElTp*)malloc(N*sizeof(ElTp));
@@ -214,7 +214,6 @@ int main() {
     testSegmScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-
 
     testOnlyScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testOnlyScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);

@@ -44,14 +44,13 @@ OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
 
-int32_t getNumElemPerThread(bool is_sgm) {
-    float tau = is_sgm ? 1.0 : 0.0;
-    float num = (ELEMS_PER_THREAD * 4.0) / (sizeof(ElTp) + tau);
+int32_t getNumElemPerThread() {
+    float num = (ELEMS_PER_THREAD * 4.0) / sizeof(ElTp);
     return (int32_t) num;
 }
 
-inline size_t getNumBlocks(bool is_sgm, const uint32_t N) {
-    const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread(is_sgm);
+inline size_t getNumBlocks(const uint32_t N) {
+    const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread();
     return (N + numelems_group - 1) / numelems_group;
 }
 
@@ -62,8 +61,8 @@ uint32_t getNumBlocksPadWarp(uint32_t num_blocks, uint32_t num_bytes) {
 }
 
 void initOclControl() {
-    int32_t num_elem_per_thread     = getNumElemPerThread(false);
-    int32_t sgm_num_elem_per_thread = getNumElemPerThread(true );
+    int32_t num_elem_per_thread     = getNumElemPerThread();
+    int32_t sgm_num_elem_per_thread = getNumElemPerThread();
     char    compile_opts[128];
     sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d -D SGM_ELEMS_PER_THREAD=%d", 
                           lgWARP, num_elem_per_thread, sgm_num_elem_per_thread);
@@ -80,7 +79,7 @@ void initOclBuffers(const uint32_t N, bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_i
     size_t size;
 
     // constants
-    size_t  num_blocks = getNumBlocks(is_sgm, N);
+    size_t  num_blocks = getNumBlocks(N);
     buffs.N = N;
     buffs.num_blocks_paded = getNumBlocksPadWarp(num_blocks, 1);
 
@@ -126,7 +125,7 @@ void initKernels(const bool is_sgm) {
     unsigned int counter = 0;
 
     { // Scan kernels
-        int32_t num_elem_per_thread = getNumElemPerThread(is_sgm);
+        int32_t num_elem_per_thread = getNumElemPerThread();
         const size_t LOCAL_SIZE_EXCG = WORKGROUP_SIZE * num_elem_per_thread;
 
         kers.single_scan_ker = clCreateKernel(ctrl.cpProgram, is_sgm? "singlePassSgmScanKer" : "singlePassScanKer", &ciErr);
@@ -148,8 +147,6 @@ void initKernels(const bool is_sgm) {
         oclCheckError(ciErr, CL_SUCCESS);
 
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(int32_t), NULL); // __local block_id
-        if (is_sgm)
-            ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG, NULL); // local memory for flags
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG * sizeof(ElTp), NULL); // local memory for elements
 //        ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, WARP, NULL); // __local warpscan: encodes both number of used and status flags.
         oclCheckError(ciErr, CL_SUCCESS);
