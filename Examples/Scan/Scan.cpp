@@ -209,7 +209,7 @@ int main() {
         ctrl.dev_id = GPU_DEV_ID;
         initOclControl();
     }
-
+#if 1
     testSegmScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
@@ -219,7 +219,7 @@ int main() {
     testOnlyScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testOnlyScan(N/10, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-
+#endif
     const uint32_t M = 4096*4096;
 //    const uint32_t M = 20 * ELEMS_PER_THREAD * WORKGROUP_SIZE;
     testOnlyScan(M, cpu_inp, cpu_flg, cpu_ref, cpu_out);
@@ -232,3 +232,4 @@ int main() {
 }
 
 // /usr/lib/x86_64-linux-gnu/libOpenCL.so
+// For Apple: g++ -O2 Scan.cpp -framework OpenCL
