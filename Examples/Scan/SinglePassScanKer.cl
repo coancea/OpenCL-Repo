@@ -32,7 +32,13 @@ enum {
     STATUS_X = 0,
     STATUS_A = 1,
     STATUS_P = 2
-}; 
+};
+
+uint8_t  getLower16(const uint32_t w) { return (uint8_t)(w & ((1<<16)-1)); }
+uint8_t  getUpper16(const uint32_t w) { return (uint8_t)(w >> 16); }
+uint32_t mkFlStComp(const uint8_t flg, const uint8_t stat) {
+    uint32_t res = flg; res = (res << 16); res += stat; return res;
+}
 
 inline uint8_t getStatus(const uint8_t usd_flg) { return usd_flg &  3; }
 inline uint8_t getUsed  (const uint8_t usd_flg) { return usd_flg >> 2; }
@@ -127,17 +133,47 @@ incSpecialScanWarp (  __local volatile ElTp* sh_data
 
 inline void
 incSpecialSgmScanWarp ( __local volatile ElTp* sh_data
-                      , __local volatile uint8_t* sh_status
-                      , __local volatile uint8_t* sh_flags
+                      , __local volatile uint32_t* sh_flags
                       , const size_t lane
 ) {
-    if( lane >= 1 ) flgBinOpInLocMem( sh_data, sh_status, sh_flags, lane-1, lane );
-    if( lane >= 2 ) flgBinOpInLocMem( sh_data, sh_status, sh_flags, lane-2, lane );
-    if( lane >= 4 ) flgBinOpInLocMem( sh_data, sh_status, sh_flags, lane-4, lane );
-    if( lane >= 8 ) flgBinOpInLocMem( sh_data, sh_status, sh_flags, lane-8, lane );
-#if WARP == 32
-    if( lane >= 16) flgBinOpInLocMem( sh_data, sh_status, sh_flags, lane-16, lane);
-#endif
+    #pragma unroll
+    for (int32_t i=0; i<lgWARP; i++) {
+        int32_t p = 1 << i;
+        if (lane >= p) {
+            //flgBinOpInLocMem( sh_data, sh_flags, lane-p, lane );
+            size_t cur_th = lane;
+            size_t acc_th = lane - p;
+            uint8_t usd1, stat1, stat2, tmp;
+            FlgTuple tup1, tup2;
+            { // get accumulator values
+                uint32_t acc_fl_usst = sh_flags[acc_th];
+                tup1.flg = getUpper16(acc_fl_usst);
+                tmp = getLower16(acc_fl_usst);
+                stat1 = getStatus(tmp); usd1 = getUsed(tmp);   
+                tup1.val = sh_data[acc_th];
+            }
+            { // get current elem values
+                uint32_t acc_fl_usst = sh_flags[cur_th];
+                tup2.flg = getUpper16(acc_fl_usst);
+                tmp = getLower16(acc_fl_usst);
+                stat2 = getStatus(tmp); 
+                tup1.val = sh_data[cur_th];
+            }
+            if (stat2 != STATUS_A) {
+                tup1.flg = 0;
+                tup1.val = NE;
+                usd1     = 0;
+                stat1    = stat2;
+            }  
+            usd1 += getUsed(tmp);
+            stat1 = mkStatusUsed(usd1, stat1);
+            {
+                FlgTuple res = binOpFlg( tup1, tup2 );
+                sh_flags[cur_th] = mkFlStComp(res.flg, stat1); 
+                sh_data [cur_th] = res.val;
+            }   
+        }
+    }
 }
 
 
@@ -215,7 +251,7 @@ incScanGroup ( __local volatile ElTp* sh_data, const size_t th_id) {
 }  
  
 inline void 
-incScanGroup1 ( __local volatile ElTp*   sh_data, const size_t tid) {
+incScanGroup0 ( __local volatile ElTp*   sh_data, const size_t tid) {
     const size_t lane   = tid & (WARP-1);
     const size_t warpid = tid >> lgWARP;
 
@@ -492,7 +528,7 @@ __kernel void singlePassSgmScanKer (
     const size_t  tid = get_local_id(0);
 
     if (tid == 0) {
-        int32_t id  = atomic_add(&global_id[0], 1);
+        int32_t id = atomic_add(&global_id[0], 1);
         statusflgs[id] = STATUS_X;
         block_id[0] = id;
 
@@ -506,17 +542,17 @@ __kernel void singlePassSgmScanKer (
     barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
 
     const int32_t WG_ID = block_id[0];
-    const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
-    uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
 
     FlgTuple chunk[SGM_ELEMS_PER_THREAD];
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
+        const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
             ElTp v = (gind < N) ? d_inp[gind] : NE;
             exchange[gind - block_offset] = v;
         }
+        uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
         barrier(CLK_LOCAL_MEM_FENCE);
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
@@ -529,12 +565,14 @@ __kernel void singlePassSgmScanKer (
       // by means of shared memory. For performance reasons, work with `uint32_t`
       // rather than `uint8_t` in local memory, in order to reduce conflicts.
         volatile __local uint32_t* restrict exchflgs = (__local  uint32_t*) exchange;
+        const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             uint32_t gind = block_offset + i*get_local_size(0) + tid;
             uint8_t v = (gind < N) ? d_flg[gind] : 0;
             exchflgs[gind - block_offset] = v;
         }
+        uint32_t loc_offset = tid * SGM_ELEMS_PER_THREAD;
         barrier(CLK_LOCAL_MEM_FENCE);
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
@@ -572,7 +610,7 @@ __kernel void singlePassSgmScanKer (
 
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF WARP!)
     { 
-        volatile __local  uint8_t* restrict exchflgs = (__local  uint8_t*) (exchange + get_local_size(0));
+        volatile __local  uint32_t* restrict exchflgs = (__local  uint32_t*) (exchange + get_local_size(0));
         if ( (WG_ID == 0) && (tid == 0) ) { // first workgroup, first thread
             incprefix[WG_ID] = acc.val;
             if (acc.flg > 0) { acc.flg = 1; }
@@ -582,7 +620,6 @@ __kernel void singlePassSgmScanKer (
             acc.flg = 0; acc.val = NE;
         } 
         if ( (WG_ID != 0) && (tid < WARP) ) { // the other workgroups, first WARP
-            volatile __local  uint8_t* restrict warpscan = exchflgs + get_local_size(0);
             if ( tid == 0 ) { // first thread
                 // record this workgroup status a.s.a.p.
                 aggregates[WG_ID] = acc.val;
@@ -590,10 +627,10 @@ __kernel void singlePassSgmScanKer (
                 mem_fence(CLK_GLOBAL_MEM_FENCE);
                 statusflgs[WG_ID] = mkStatusUsed(acc.flg, STATUS_A);
                 // read previous workgroup status for fasttrack opportunity
-                warpscan[0] = statusflgs[WG_ID-1];
+                exchflgs[0] = statusflgs[WG_ID-1];
             }
             mem_fence(CLK_LOCAL_MEM_FENCE); 
-            uint8_t stat1 = warpscan[0];
+            uint8_t stat1 = (uint8_t)exchflgs[0];
 	        if (getStatus(stat1) == STATUS_P) {
                 // important performance optimization:
                 // do not enter the expensive communication if
@@ -626,29 +663,30 @@ __kernel void singlePassSgmScanKer (
                         } else { flag = 0; }
                     }
                     // init local data for warp-reduce
-                    exchflgs[tid] = flag;
                     exchange[tid] = aggr;
-                    warpscan[tid] = mkStatusUsed(used, stat);
-                    if(warpscan[WARP-1] != STATUS_P)
-                        incSpecialSgmScanWarp(exchange, warpscan, exchflgs, tid);
-
+                    exchflgs[tid] = mkFlStComp(flag, mkStatusUsed(used, stat));
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    if(getLower16(exchflgs[WARP-1]) != STATUS_P)
+                        incSpecialSgmScanWarp(exchange, exchflgs, tid);
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    uint32_t tmp_flust = exchflgs[WARP-1];
+                    if ( tid == 0 ) {
+                        // update prefix 
+                        FlgTuple aggr; 
+                        aggr.flg = getUpper16(tmp_flust);
+                        aggr.val = exchange[WARP-1];
+                        prefix = binOpFlg(aggr, prefix);
+                    }
                     { // update read_offset
-                        uint8_t usedflg_val = warpscan[WARP-1];
+                        uint32_t usedflg_val = getLower16(tmp_flust);
                         stat = getStatus(usedflg_val);
                         if (stat == STATUS_P) { // LOOP WILL EXIT
                             // publish exit condition
                             read_offset = LOOP_STOP;
                         } else {
-                            used = getUsed  (usedflg_val);
+                            used = getUsed(usedflg_val);
                             read_offset = read_offset - used;
                         }
-                    }
-                    if ( tid == 0 ) {
-                        // update prefix 
-                        FlgTuple aggr; 
-                        aggr.flg = exchflgs[WARP-1];
-                        aggr.val = exchange[WARP-1];
-                        prefix = binOpFlg(aggr, prefix);
                     }
                 } // end WHILE loop
             } // end ELSE branch of IF(stat1 == STATUS_P)
@@ -669,22 +707,22 @@ __kernel void singlePassSgmScanKer (
      
         if (WG_ID != 0) {
             barrier(CLK_LOCAL_MEM_FENCE);
-            prefix.flg = exchflgs[0];
+            if (exchflgs[0] > 0) { prefix.flg = 1; } else { prefix.flg = 0; }
             prefix.val = exchange[0];
             barrier(CLK_LOCAL_MEM_FENCE);
         }
-    }
-
+    } 
+ 
     { // finally read and add prefix to every element in this workgroup
       // Coalesced write to global-output 'data' from register 'chunk' by means of shared memory
         acc = binOpFlg(prefix, acc);
+        const uint32_t local_offset = tid*SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (uint32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
             FlgTuple res = binOpFlg(acc, chunk[i]);
-            exchange[tid*SGM_ELEMS_PER_THREAD+i] = res.val;
+            exchange[local_offset+i] = res.val;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-
         const uint32_t block_offset = WG_ID * get_local_size(0) * SGM_ELEMS_PER_THREAD;
         #pragma unroll
         for (int32_t i = 0; i < SGM_ELEMS_PER_THREAD; i++) {
