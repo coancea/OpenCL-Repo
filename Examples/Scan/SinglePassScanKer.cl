@@ -122,13 +122,11 @@ incSpecialScanWarp (  __local volatile ElTp* sh_data
                     , __local volatile uint8_t* sh_status
                     , const int32_t  lane
 ) {
-    if( lane >= 1 ) binOpInLocMem( sh_data, sh_status, lane-1, lane );
-    if( lane >= 2 ) binOpInLocMem( sh_data, sh_status, lane-2, lane );
-    if( lane >= 4 ) binOpInLocMem( sh_data, sh_status, lane-4, lane );
-    if( lane >= 8 ) binOpInLocMem( sh_data, sh_status, lane-8, lane );
-#if WARP == 32
-    if( lane >= 16) binOpInLocMem( sh_data, sh_status, lane-16, lane);
-#endif
+    #pragma unroll
+    for(uint32_t i=0; i<lgWARP; i++) {
+        const uint32_t p = (1<<i);
+        if( lane >= p ) binOpInLocMem( sh_data, sh_status, lane-p, lane );
+    }
 }
 
 inline void
@@ -180,13 +178,11 @@ incSpecialSgmScanWarp ( __local volatile ElTp* sh_data
 inline ElTp
 incScanWarp(__local volatile ElTp* sh_data, const size_t th_id) { 
     const size_t lane = th_id & (WARP-1);
-    if( lane >= 1 ) sh_data[th_id] = binOp( sh_data[th_id-1 ], sh_data[th_id] );
-    if( lane >= 2 ) sh_data[th_id] = binOp( sh_data[th_id-2 ], sh_data[th_id] );
-    if( lane >= 4 ) sh_data[th_id] = binOp( sh_data[th_id-4 ], sh_data[th_id] );
-    if( lane >= 8 ) sh_data[th_id] = binOp( sh_data[th_id-8 ], sh_data[th_id] );
-#if WARP == 32
-    if( lane >= 16) sh_data[th_id] = binOp( sh_data[th_id-16], sh_data[th_id] );
-#endif
+    #pragma unroll
+    for(uint32_t i=0; i<lgWARP; i++) {
+        const uint32_t p = (1<<i);
+        if( lane >= p ) sh_data[th_id] = binOp( sh_data[th_id-p], sh_data[th_id] );
+    }
     return sh_data[th_id];
 }
 
@@ -196,44 +192,16 @@ incSgmScanWarp  ( __local volatile uint8_t* sh_flag
                 , const size_t th_id
 ) {
     const size_t lane = th_id & (WARP-1);
-    if( lane >= 1 ) {
-        //sh_data[th_id] = binOp( sh_data[th_id-1 ], sh_data[th_id] );
-        FlgTuple tup1; tup1.flg = sh_flag[th_id-1 ]; tup1.val = sh_data[th_id-1 ];
-        FlgTuple tup2; tup2.flg = sh_flag[th_id   ]; tup2.val = sh_data[th_id   ];
-        FlgTuple tup3 = binOpFlg( tup1, tup2 );
-        sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
+    #pragma unroll
+    for(uint32_t i=0; i<lgWARP; i++) {
+        const uint32_t p = (1<<i);
+        if( lane >= p ) {
+            FlgTuple tup1; tup1.flg = sh_flag[th_id-p]; tup1.val = sh_data[th_id-p];
+            FlgTuple tup2; tup2.flg = sh_flag[th_id  ]; tup2.val = sh_data[th_id  ];
+            FlgTuple tup3 = binOpFlg( tup1, tup2 );
+            sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
+        }
     }
-    if( lane >= 2 ) {
-        //sh_data[th_id] = binOp( sh_data[th_id-2 ], sh_data[th_id] );
-        FlgTuple tup1; tup1.flg = sh_flag[th_id-2 ]; tup1.val = sh_data[th_id-2 ];
-        FlgTuple tup2; tup2.flg = sh_flag[th_id   ]; tup2.val = sh_data[th_id   ];
-        FlgTuple tup3 = binOpFlg( tup1, tup2 );
-        sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
-    }
-    if( lane >= 4 ) {
-        //sh_data[th_id] = binOp( sh_data[th_id-4 ], sh_data[th_id] );
-        FlgTuple tup1; tup1.flg = sh_flag[th_id-4 ]; tup1.val = sh_data[th_id-4 ];
-        FlgTuple tup2; tup2.flg = sh_flag[th_id   ]; tup2.val = sh_data[th_id   ];
-        FlgTuple tup3 = binOpFlg( tup1, tup2 );
-        sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
-    }
-    if( lane >= 8 ) {
-        //sh_data[th_id] = binOp( sh_data[th_id-8 ], sh_data[th_id] );
-        FlgTuple tup1; tup1.flg = sh_flag[th_id-8 ]; tup1.val = sh_data[th_id-8 ];
-        FlgTuple tup2; tup2.flg = sh_flag[th_id   ]; tup2.val = sh_data[th_id   ];
-        FlgTuple tup3 = binOpFlg( tup1, tup2 );
-        sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
-    }
-#if WARP == 32
-    if( lane >= 16) {
-        //sh_data[th_id] = binOp( sh_data[th_id-16], sh_data[th_id] );
-        FlgTuple tup1; tup1.flg = sh_flag[th_id-16]; tup1.val = sh_data[th_id-16];
-        FlgTuple tup2; tup2.flg = sh_flag[th_id   ]; tup2.val = sh_data[th_id   ];
-        FlgTuple tup3 = binOpFlg( tup1, tup2 );
-        sh_flag[th_id] = tup3.flg; sh_data[th_id] = tup3.val;
-    }
-#endif
-    //return sh_data[th_id];
     FlgTuple res; res.flg = sh_flag[th_id]; res.val = sh_data[th_id]; return res;
 }
 
@@ -451,13 +419,13 @@ __kernel void singlePassScanKer (
                     }
                     exchange[tid]       = aggr;
                     warpscan[tid]       = mkStatusUsed(used, flag);
-                    //mem_fence(CLK_LOCAL_MEM_FENCE);
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
                     // perform reduce
                     if(warpscan[WARP-1] != STATUS_P)
                         incSpecialScanWarp(exchange, warpscan, tid);
-                    //mem_fence(CLK_LOCAL_MEM_FENCE);
-                    
-                    { // read result from local data after warp reduce
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    if ( tid == 0 ) {
+                        // read result from local data after warp reduce
                         uint8_t usedflg_val = warpscan[WARP-1];
                         flag = getStatus(usedflg_val);
                         if (flag == STATUS_P) { // LOOP WILL BE EXITED
@@ -466,12 +434,13 @@ __kernel void singlePassScanKer (
                             used = getUsed  (usedflg_val);
                             read_offset = read_offset - used;
                         }
-                    }
-                    if ( tid == 0 ) {
+                        block_id[0] = read_offset;
                         // update prefix with the current contribution
                         aggr = exchange[WARP-1];
                         prefix = binOp(aggr, prefix);
                     }
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    read_offset = block_id[0];
                 } // END WHILE loop
             } // END ELSE branch of if (stat1 == STATUS_P)
             if(tid == 0) {
@@ -669,16 +638,10 @@ __kernel void singlePassSgmScanKer (
                     if(getLower16(exchflgs[WARP-1]) != STATUS_P)
                         incSpecialSgmScanWarp(exchange, exchflgs, tid);
                     mem_fence(CLK_LOCAL_MEM_FENCE);
-                    uint32_t tmp_flust = exchflgs[WARP-1];
                     if ( tid == 0 ) {
-                        // update prefix 
-                        FlgTuple aggr; 
-                        aggr.flg = getUpper16(tmp_flust);
-                        aggr.val = exchange[WARP-1];
-                        prefix = binOpFlg(aggr, prefix);
-                    }
-                    { // update read_offset
-                        uint32_t usedflg_val = getLower16(tmp_flust);
+                        // update read_offset
+                        uint32_t tmp_flust = exchflgs[WARP-1];
+                        uint8_t usedflg_val = getLower16(tmp_flust);
                         stat = getStatus(usedflg_val);
                         if (stat == STATUS_P) { // LOOP WILL EXIT
                             // publish exit condition
@@ -687,7 +650,16 @@ __kernel void singlePassSgmScanKer (
                             used = getUsed(usedflg_val);
                             read_offset = read_offset - used;
                         }
+                        block_id[0] = read_offset;
+
+                        // update prefix 
+                        FlgTuple aggr; 
+                        aggr.flg = getUpper16(tmp_flust);
+                        aggr.val = exchange[WARP-1];
+                        prefix = binOpFlg(aggr, prefix);
                     }
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+                    read_offset = block_id[0];
                 } // end WHILE loop
             } // end ELSE branch of IF(stat1 == STATUS_P)
             if(tid == 0) {
