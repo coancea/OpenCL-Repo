@@ -34,9 +34,9 @@ enum {
     STATUS_P = 2
 };
 
-uint8_t  getLower16(const uint32_t w) { return (uint8_t)(w & ((1<<16)-1)); }
-uint8_t  getUpper16(const uint32_t w) { return (uint8_t)(w >> 16); }
-uint32_t mkFlStComp(const uint8_t flg, const uint8_t stat) {
+inline uint8_t  getLower16(const uint32_t w) { return (uint8_t)(w & ((1<<16)-1)); }
+inline uint8_t  getUpper16(const uint32_t w) { return (uint8_t)(w >> 16); }
+inline uint32_t mkFlStComp(const uint8_t flg, const uint8_t stat) {
     uint32_t res = flg; res = (res << 16); res += stat; return res;
 }
 
@@ -377,7 +377,7 @@ __kernel void singlePassScanKer (
             acc = NE;
         }
         if ( (WG_ID != 0) && (tid < WARP) ) { // WG_ID != 0, first warp, all lanes
-            volatile __local uint8_t *restrict warpscan = (volatile __local uint8_t*)(exchange+get_local_size(0));
+            volatile __local uint8_t * warpscan = (volatile __local uint8_t*)(exchange+get_local_size(0));
             
             if ( tid == 0 ) { // first lane
                 // publish the partial result a.s.a.p.

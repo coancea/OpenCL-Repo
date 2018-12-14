@@ -221,6 +221,7 @@ int main() {
     testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     const uint32_t M = 4096*4096;
+//    const uint32_t M = 20 * ELEMS_PER_THREAD * WORKGROUP_SIZE;
     testOnlyScan(M, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     oclControlCleanUp();
