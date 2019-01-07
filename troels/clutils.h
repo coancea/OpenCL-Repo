@@ -28,6 +28,34 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <string.h>
+
+//// Non-OpenCL utility functions.
+
+// Read a file into a NUL-terminated string; returns NULL on error.
+char* slurp_file(const char *filename) {
+  char *s;
+  FILE *f = fopen(filename, "r");
+  if (f == NULL) return NULL;
+  fseek(f, 0, SEEK_END);
+  size_t src_size = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  s = malloc(src_size + 1);
+  if (fread(s, 1, src_size, f) != src_size) {
+    free(s);
+    s = NULL;
+  }
+  s[src_size] = '\0';
+  fclose(f);
+
+  return s;
+}
+
+// Unsigned integer division, rounding up.
+size_t div_rounding_up(size_t x, size_t y) {
+  return (x + y - 1) / y;
+}
 
 // Terminate the process with given error code, but first printing the
 // given printf()-style error message.
@@ -40,6 +68,8 @@ static void panic(int eval, const char *fmt, ...)
 	va_end(ap);
         exit(eval);
 }
+
+//// Now for OpenCL.
 
 // Transform an OpenCL error code to an error message.
 static const char* opencl_error_string(unsigned int err)
@@ -108,4 +138,92 @@ static void opencl_succeed_fatal(unsigned int ret,
   }
 }
 
+// Terminate the process with an error message unless the argument is CL_SUCCESS.
 #define OPENCL_SUCCEED(e) opencl_succeed_fatal(e, #e, __FILE__, __LINE__)
+
+// Create a context and command queue for the given platform and
+// device ID.  Terminates the program on error.
+static void opencl_init_command_queue(unsigned int platform_index, unsigned int device_index,
+                                      cl_device_id *device, cl_context *ctx, cl_command_queue *queue) {
+  cl_uint num_platforms;
+  OPENCL_SUCCEED(clGetPlatformIDs(0, NULL, &num_platforms));
+  cl_platform_id *all_platforms = calloc(num_platforms, sizeof(cl_platform_id));
+  OPENCL_SUCCEED(clGetPlatformIDs(num_platforms, all_platforms, NULL));
+
+  assert(platform_index < num_platforms);
+  cl_platform_id platform = all_platforms[platform_index];
+
+  cl_uint num_devices;
+  OPENCL_SUCCEED(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL, &num_devices));
+  cl_device_id *platform_devices = calloc(num_devices, sizeof(cl_device_id));
+  OPENCL_SUCCEED(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL,
+                                num_devices, platform_devices, NULL));
+
+  assert(device_index < num_devices);
+  *device = platform_devices[device_index];
+
+
+  // NVIDIA's OpenCL requires the platform property
+  cl_context_properties properties[] = {
+    CL_CONTEXT_PLATFORM,
+    (cl_context_properties)platform,
+    0
+  };
+
+  cl_int error;
+  *ctx = clCreateContext(properties, 1, device, NULL, NULL, &error);
+  OPENCL_SUCCEED(error);
+
+  *queue = clCreateCommandQueue(*ctx, *device, 0, &error);
+  OPENCL_SUCCEED(error);
+
+  free(all_platforms);
+}
+
+static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
+                                       const char *file, const char *options) {
+  cl_int error;
+  const char *kernel_src = slurp_file(file);
+  assert(kernel_src != NULL);
+  size_t src_len = strlen(kernel_src);
+
+  cl_program program = clCreateProgramWithSource(ctx, 1, &kernel_src, &src_len, &error);
+  OPENCL_SUCCEED(error);
+
+  // Here we are a bit more generous than usual and do not terminate
+  // the process immediately on a build error.  Instead, we print the
+  // error messages first.
+  error = clBuildProgram(program, 1, &device, options, NULL, NULL);
+  if (error != CL_SUCCESS && error != CL_BUILD_PROGRAM_FAILURE) {
+    OPENCL_SUCCEED(error);
+  }
+
+  cl_build_status build_status;
+  OPENCL_SUCCEED(clGetProgramBuildInfo(program,
+                                       device,
+                                       CL_PROGRAM_BUILD_STATUS,
+                                       sizeof(cl_build_status),
+                                       &build_status,
+                                       NULL));
+
+  if (build_status != CL_SUCCESS) {
+    char *build_log;
+    size_t ret_val_size;
+    OPENCL_SUCCEED(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, NULL, &ret_val_size));
+
+    build_log = malloc(ret_val_size+1);
+    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, ret_val_size, build_log, NULL);
+
+    // The spec technically does not say whether the build log is
+    // zero-terminated, so let's be careful.
+    build_log[ret_val_size] = '\0';
+
+    fprintf(stderr, "Build log:\n%s\n", build_log);
+
+    free(build_log);
+
+    OPENCL_SUCCEED(build_status);
+  }
+
+  return program;
+}

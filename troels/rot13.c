@@ -1,0 +1,66 @@
+// A very simple program showing how to start up OpenCL and run a
+// simple kernel.
+
+#include "clutils.h"
+
+int main() {
+  cl_context ctx;
+  cl_command_queue queue;
+  cl_device_id device;
+  cl_int error = CL_SUCCESS;
+
+  opencl_init_command_queue(0, 0, &device, &ctx, &queue);
+
+  // Construct and build an OpenCL program from disk.
+  cl_program program = opencl_build_program(ctx, device, "kernels/rot13.cl", "");
+
+  // Construct the kernel from the program.
+  cl_kernel rot13_k = clCreateKernel(program, "rot13", &error);
+  OPENCL_SUCCEED(error);
+
+  // Now we are ready to run.
+
+  const char *string = "Hello, World!\n";
+  cl_int n = strlen(string);
+
+  // Note: CL_MEM_READ_ONLY is only a restriction on kernels, not the host.
+  cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY, strlen(string), NULL, &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem output = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, strlen(string), NULL, &error);
+  OPENCL_SUCCEED(error);
+
+  // Write the input to the kernel, asynchronously.
+  clEnqueueWriteBuffer(queue, input,
+                       CL_FALSE, // Non-blocking write
+                       0, // Offset in 'input'.
+                       n, // Number of bytes to copy.
+                       string, // Where to copy from.
+                       0, NULL, NULL);
+
+  // Wait for the write to succeed.
+  OPENCL_SUCCEED(clFinish(queue));
+
+  clSetKernelArg(rot13_k, 0, sizeof(cl_mem), &output);
+  clSetKernelArg(rot13_k, 1, sizeof(cl_mem), &input);
+  clSetKernelArg(rot13_k, 2, sizeof(cl_int), &n);
+
+  // Enqueue the rot13 kernel.
+  size_t local_work_size[1] = { 256 };
+  size_t global_work_size[1] = { div_rounding_up(n, local_work_size[0]) * local_work_size[0] };
+  clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+
+  // Wait for the kernel to stop.
+  OPENCL_SUCCEED(clFinish(queue));
+
+  // Read back the result.
+  char *output_string = malloc(n + 1);
+  output_string[n] = '\0'; // Ensure 0-termination.
+  clEnqueueReadBuffer(queue, output,
+                      CL_TRUE, // Blocking read.
+                      0, n, // Offset zero in GPU memory, n bytes.
+                      output_string, // Where to write on the host.
+                      0, NULL, NULL);
+
+  printf("Result: %s\n", output_string);
+}
