@@ -1,13 +1,15 @@
-#include "../utils/Util.h"
+#include "../../clutils.h"
+#include <stdbool.h>
+#include <math.h>
 
+#define GPU_DEV_ID          0
 #define REPEAT              200
 #define ELEMS_PER_THREAD    9
 
 #include "GenericHack.h"
-#include "../utils/SDK_stub.h"
 #include "SetupOpenCL.h"
 
-void runMemCopy(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
+void runMemCopy(bool is_sgm) {
     const uint32_t num_blocks     = (buffs.N + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
     const size_t   localWorkSize  = WORKGROUP_SIZE;
     const size_t   globalWorkSize = num_blocks * localWorkSize;
@@ -17,28 +19,23 @@ void runMemCopy(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
 
         // make two dry runs
         for (int32_t i=0; i<2; i++) { 
-            ciErr1 |= clEnqueueNDRangeKernel(ctrl.cqCommandQueue, kers.mem_cpy_ker, 1, NULL,
+            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.mem_cpy_ker, 1, NULL,
                                              &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-            clFinish(ctrl.cqCommandQueue);
-            oclCheckError(ciErr1, CL_SUCCESS);
+            clFinish(ctrl.queue);
+            OPENCL_SUCCEED(ciErr1);
         } 
 
-        unsigned long int elapsed;
-        struct timeval t_start, t_end, t_diff;
-        gettimeofday(&t_start, NULL);
-
+        int64_t elapsed, aft, bef = get_wall_time();
         { // timing runs
             for (int32_t i = 0; i < REPEAT; i++) {
-                ciErr1 |= clEnqueueNDRangeKernel(ctrl.cqCommandQueue, kers.mem_cpy_ker, 1, NULL,
+                ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.mem_cpy_ker, 1, NULL,
                                                  &globalWorkSize, &localWorkSize, 0, NULL, NULL);
             }
-            clFinish(ctrl.cqCommandQueue);
+            clFinish(ctrl.queue);
         }
-
-        gettimeofday(&t_end, NULL);
-        timeval_subtract(&t_diff, &t_end, &t_start);
-        elapsed = t_diff.tv_sec*1e6+t_diff.tv_usec;
-        oclCheckError(ciErr1, CL_SUCCESS);
+        aft = get_wall_time();
+        elapsed = aft - bef;
+        OPENCL_SUCCEED(ciErr1);
 
         if (is_sgm)
             fprintf(stdout, "GPU Memcopy-WithFlag runs in: %ld microseconds on GPU; N: %d\n\n", elapsed/REPEAT, buffs.N);
@@ -49,13 +46,13 @@ void runMemCopy(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
 
 /** Input:
  *    @is_sgm@  segmented or starightforward version of scan 
- *    @cpu_flg@ the input  flag  array allocated on the host (CPU)
- *    @cpu_inp@ the input  value array allocated on the host (CPU)
+ *    the input flag array is available in @buffs.gpu_flg@
+ *    the input value array is available in @buffs.gpu_inp@
  *    The length of the input arrays is available in @buffs.N@
  *  The Result:
  *    is stored in @buffs.gpu_out@ -- see SetupOpenCL.h file. 
  */
-void runSinglePassScan(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
+void runSinglePassScan(bool is_sgm) {
     const size_t   numelems_group = WORKGROUP_SIZE * getNumElemPerThread();
     const uint32_t num_blocks     = (buffs.N + numelems_group - 1) / numelems_group;
     const size_t   localWorkSize  = WORKGROUP_SIZE;
@@ -66,28 +63,23 @@ void runSinglePassScan(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
 
         // make two dry runs
         for (int32_t i=0; i<2; i++) { 
-            ciErr1 |= clEnqueueNDRangeKernel(ctrl.cqCommandQueue, kers.single_scan_ker, 1, NULL,
+            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.single_scan_ker, 1, NULL,
                                              &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-            clFinish(ctrl.cqCommandQueue);
-            oclCheckError(ciErr1, CL_SUCCESS);
+            clFinish(ctrl.queue);
+            OPENCL_SUCCEED(ciErr1);
         }
 
-        unsigned long int elapsed;
-        struct timeval t_start, t_end, t_diff;
-        gettimeofday(&t_start, NULL);
-
+        int64_t elapsed, aft, bef = get_wall_time();
         { // timing runs
             for (int32_t i = 0; i < REPEAT; i++) {
-                ciErr1 |= clEnqueueNDRangeKernel(ctrl.cqCommandQueue, kers.single_scan_ker, 1, NULL,
+                ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.single_scan_ker, 1, NULL,
                                                  &globalWorkSize, &localWorkSize, 0, NULL, NULL);
             }
-            clFinish(ctrl.cqCommandQueue);
+            clFinish(ctrl.queue);
         }
-
-        gettimeofday(&t_end, NULL);
-        timeval_subtract(&t_diff, &t_end, &t_start);
-        elapsed = t_diff.tv_sec*1e6+t_diff.tv_usec;
-        oclCheckError(ciErr1, CL_SUCCESS);
+        aft = get_wall_time();
+        elapsed = aft - bef;
+        OPENCL_SUCCEED(ciErr1);
         if (is_sgm)
             fprintf(stdout, "GPU Single-Pass Segmented-Scan runs in: %ld microseconds on GPU; N: %d ...", elapsed/REPEAT, buffs.N);
         else
@@ -96,7 +88,7 @@ void runSinglePassScan(bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_inp) {
 } 
 
 void mkRandomDataset (const uint32_t N, ElTp* data, uint8_t* flags) {
-    for (int i = 0; i < N; ++i) {
+    for (uint32_t i = 0; i < N; ++i) {
         float r01 = rand() / (float)RAND_MAX;
         float r   = r01 - 0.5;
         data[i]   = spreadData(r);
@@ -106,10 +98,7 @@ void mkRandomDataset (const uint32_t N, ElTp* data, uint8_t* flags) {
 }
 
 void goldenScan (bool is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_flags, ElTp* cpu_out) {
-    unsigned long int elapsed;
-    struct timeval t_start, t_end, t_diff;
-    gettimeofday(&t_start, NULL);
-
+    int64_t elapsed, aft, bef = get_wall_time();
     for(int r=0; r < 1; r++) {
       ElTp acc = NE;
       for(uint32_t i=0; i<N; i++) {
@@ -122,10 +111,8 @@ void goldenScan (bool is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_flag
         cpu_out[i] = acc;
       }
     }
-
-    gettimeofday(&t_end, NULL);
-    timeval_subtract(&t_diff, &t_end, &t_start);
-    elapsed = t_diff.tv_sec*1e6+t_diff.tv_usec;
+    aft = get_wall_time();
+    elapsed = aft - bef;
     fprintf(stdout, "Sequential golden scan runs in: %ld microseconds on CPU\n", elapsed);
 }
 
@@ -153,7 +140,7 @@ void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     goldenScan(false, N, cpu_inp, cpu_flg, cpu_ref);
 
     // compute single-pass scan on GPUs
-    runSinglePassScan(false, cpu_flg, cpu_inp);
+    runSinglePassScan(false);
 
     // WRITE THE RESULT ARRAY BACK TO CPU
     gpuToCpuTransfer(N, cpu_out);
@@ -162,10 +149,10 @@ void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     validate(N, cpu_ref, cpu_out, N/*10000*/);
 
     // run memcopy kernel
-    runMemCopy(false, cpu_flg, cpu_inp);
+    runMemCopy(false);
 
     // Release GPU Buffer/Kernels resources!!!
-    oclReleaseBuffKers(false);
+    freeOclBuffKers(false);
 }
 
 void testSegmScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
@@ -177,7 +164,7 @@ void testSegmScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     goldenScan(true, N, cpu_inp, cpu_flg, cpu_ref);
 
     // compute single-pass scan on GPUs
-    runSinglePassScan(true, cpu_flg, cpu_inp);
+    runSinglePassScan(true);
 
     // WRITE THE RESULT ARRAY BACK TO CPU
     gpuToCpuTransfer(N, cpu_out);
@@ -186,10 +173,10 @@ void testSegmScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     validate(N, cpu_ref, cpu_out, N/*100000000*/);
 
     // run memcopy kernel
-    runMemCopy(true, cpu_flg, cpu_inp);
+    runMemCopy(true);
 
     // Release GPU Buffer/Kernels resources!!!
-    oclReleaseBuffKers(true);
+    freeOclBuffKers(true);
 }
 
 int main() {
@@ -206,7 +193,6 @@ int main() {
     {
         bool sanity_dev_id = (GPU_DEV_ID >= 0) && (GPU_DEV_ID < 16);
         assert(sanity_dev_id && "GPU DEVICE ID < 0 !\n");
-        ctrl.dev_id = GPU_DEV_ID;
         initOclControl();
     }
 #if 1
@@ -224,7 +210,7 @@ int main() {
 //    const uint32_t M = 20 * ELEMS_PER_THREAD * WORKGROUP_SIZE;
     testOnlyScan(M, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
-    oclControlCleanUp();
+    freeOclControl();
     free(cpu_inp);
     free(cpu_flg);
     free(cpu_ref);
