@@ -6,9 +6,9 @@ CFLAGS?=-std=c99 -O3 -Wall -Wextra -pedantic -Wno-unused-function
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)
-LDFLAGS?=-D DEVICE_ID=1 -framework OpenCL -lm
+LDFLAGS?=-framework OpenCL -lm
 else
-LDFLAGS?=-D DEVICE_ID=0 -lOpenCL -lm
+LDFLAGS?=-lOpenCL -lm
 endif
 
 INCLUDES?=

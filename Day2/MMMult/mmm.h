@@ -33,7 +33,8 @@ OclKernels kers;
 OclBuffers buffs;
 
 void initOclControl() {
-    opencl_init_command_queue(0, DEVICE_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
+    //opencl_init_command_queue(0, DEVICE_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
+    opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
     ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "mmm.cl", "");
 }
 

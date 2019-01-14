@@ -48,7 +48,8 @@ void initOclControl() {
     sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d -D SGM_ELEMS_PER_THREAD=%d", 
                           lgWARP, num_elem_per_thread, sgm_num_elem_per_thread);
     
-    opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
+    //opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
+    opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
     ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "SinglePassScanKer.cl", compile_opts);
 }
 

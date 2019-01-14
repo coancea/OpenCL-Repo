@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <math.h>
 
-#define GPU_DEV_ID          0
 #define REPEAT              200
 #define ELEMS_PER_THREAD    9
 
@@ -189,12 +188,8 @@ int main() {
     uint8_t* cpu_flg = (uint8_t*)malloc(N);
 
     mkRandomDataset(N, cpu_inp, cpu_flg);
+    initOclControl();
 
-    {
-        bool sanity_dev_id = (GPU_DEV_ID >= 0) && (GPU_DEV_ID < 16);
-        assert(sanity_dev_id && "GPU DEVICE ID < 0 !\n");
-        initOclControl();
-    }
 #if 1
     testSegmScan(N/1000, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testSegmScan(N/100, cpu_inp, cpu_flg, cpu_ref, cpu_out);
