@@ -6,10 +6,10 @@
 
 #define HEIGHT_A 1024 //537
 #define WIDTH_A  256  //422
-#define WIDTH_B  2048 //732 
+#define WIDTH_B  2048 //732
 
 #define RUNS_CPU 1
-#define RUNS_GPU 25
+#define RUNS_GPU 50
 
 /*******************************/
 /***        Helpers          ***/

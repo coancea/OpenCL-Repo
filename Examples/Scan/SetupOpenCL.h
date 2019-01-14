@@ -171,9 +171,6 @@ void freeOclControl() {
 
     fprintf(stderr, "Releasing Command Queue ...\n");
     clReleaseCommandQueue(ctrl.queue);
-
-    fprintf(stderr, "Releasing Devices ...\n");
-    free(ctrl.device);
         
     fprintf(stderr, "Releasing GPU context ...\n");
     clReleaseContext(ctrl.ctx);

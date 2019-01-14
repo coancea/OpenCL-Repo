@@ -1,7 +1,7 @@
 #ifndef MMM_HELPER
 #define MMM_HELPER
 
-#define DEVICE_ID 0
+#define DEVICE_ID 0 //IF two GPU devices then adjust, e.g., to 1
 
 typedef struct OCLControl {
     cl_context          ctx;          // OpenCL context
@@ -112,9 +112,6 @@ void freeOclControl() {
 
     //fprintf(stderr, "Releasing Command Queue ...\n");
     clReleaseCommandQueue(ctrl.queue);
-
-    //fprintf(stderr, "Releasing Devices ...\n");
-    free(ctrl.device);
         
     //fprintf(stderr, "Releasing GPU context ...\n");
     clReleaseContext(ctrl.ctx);
