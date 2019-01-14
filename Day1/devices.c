@@ -1,7 +1,7 @@
 // This program prints the indexes and names of all OpenCL platforms
 // and their corresponding devices.
 
-#include "clutils.h"
+#include "../clutils.h"
 
 int main() {
   cl_uint num_platforms;

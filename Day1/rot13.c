@@ -1,14 +1,9 @@
-// A simple example of how to profile an OpenCL program.
+// A very simple program showing how to start up OpenCL and run a
+// simple kernel.
 
-#include "clutils.h"
+#include "../clutils.h"
 
-int main(int argc, char** argv) {
-  cl_int n = 100000;
-  if (argc > 1) {
-    n = atoi(argv[1]);
-  }
-  printf("Rot-13 on %d characters\n", n);
-
+int main() {
   cl_context ctx;
   cl_command_queue queue;
   cl_device_id device;
@@ -25,11 +20,8 @@ int main(int argc, char** argv) {
 
   // Now we are ready to run.
 
-  char *string = malloc(n+1);
-  string[n] = 0;
-  for (int i = i; i < n; i++) {
-    string[i] = i;
-  }
+  const char *string = "Hello, World!\n";
+  cl_int n = strlen(string);
 
   // Note: CL_MEM_READ_ONLY is only a restriction on kernels, not the host.
   cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY, n, NULL, &error);
@@ -56,20 +48,19 @@ int main(int argc, char** argv) {
   // Enqueue the rot13 kernel.
   size_t local_work_size[1] = { 256 };
   size_t global_work_size[1] = { div_rounding_up(n, local_work_size[0]) * local_work_size[0] };
+  clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
 
-  int runs = 10;
-
-  int64_t bef = get_wall_time();
-  for (int i = 0; i < runs; i++) {
-    clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
-  }
-
-  // Wait for the kernel(s) to stop.
+  // Wait for the kernel to stop.
   OPENCL_SUCCEED(clFinish(queue));
 
-  int64_t aft = get_wall_time();
-  int64_t elapsed_us = aft-bef;
+  // Read back the result.
+  char *output_string = malloc(n + 1);
+  output_string[n] = '\0'; // Ensure 0-termination.
+  clEnqueueReadBuffer(queue, output,
+                      CL_TRUE, // Blocking read.
+                      0, n, // Offset zero in GPU memory, n bytes.
+                      output_string, // Where to write on the host.
+                      0, NULL, NULL);
 
-  printf("%d kernels of total runtime %dμs (average %dμs)\n",
-         runs, (int)elapsed_us, (int)(elapsed_us/runs));
+  printf("Result: %s\n", output_string);
 }

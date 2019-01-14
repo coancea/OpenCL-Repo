@@ -1,8 +1,15 @@
+# Generic Makefile definitions.  Import from a Makefile, and be
+# careful if changing it here.
+
 CC?=gcc
 CFLAGS?=-std=c99 -O3 -Wall -Wextra -pedantic -Wno-unused-function
-LDFLAGS?=-lOpenCL
 
-PROGRAMS=devices rot13 rot13-profile-simple
+OS=$(shell uname -s)
+ifeq ($(OS),Darwin)
+LDFLAGS?=-framework OpenCL
+else
+LDFLAGS?=-lOpenCL
+endif
 
 all: $(PROGRAMS)
 
@@ -13,3 +20,4 @@ all: $(PROGRAMS)
 
 clean:
 	rm -f $(PROGRAMS) *.o
+
