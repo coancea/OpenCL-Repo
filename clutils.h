@@ -212,6 +212,18 @@ static void opencl_init_command_queue(unsigned int platform_index, unsigned int 
   free(all_platforms);
 }
 
+// As opencl_init_command_queue(), but picking platform and device by
+// magic and/or configuration.
+static void opencl_init_command_queue_default(cl_device_id *device, cl_context *ctx, cl_command_queue *queue) {
+  const char* platform_id_str = getenv("OPENCL_PLATFORM_ID");
+  const char* device_id_str = getenv("OPENCL_DEVICE_ID");
+
+  int platform_id = platform_id_str ? atoi(platform_id_str) : 0;
+  int device_id = device_id_str ? atoi(device_id_str) : 0;
+
+  opencl_init_command_queue(platform_id, device_id, device, ctx, queue);
+}
+
 static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
                                        const char *file, const char *options) {
   cl_int error;

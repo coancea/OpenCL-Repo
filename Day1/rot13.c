@@ -9,7 +9,7 @@ int main() {
   cl_device_id device;
   cl_int error = CL_SUCCESS;
 
-  opencl_init_command_queue(0, 0, &device, &ctx, &queue);
+  opencl_init_command_queue_default(&device, &ctx, &queue);
 
   // Construct and build an OpenCL program from disk.
   cl_program program = opencl_build_program(ctx, device, "kernels/rot13.cl", "");

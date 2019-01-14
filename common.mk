@@ -11,13 +11,14 @@ else
 LDFLAGS?=-lOpenCL
 endif
 
+
+
 all: $(PROGRAMS)
 
-%: %.c clutils.h
+%: %.c ../clutils.h
 	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
 
 .PHONY: clean
 
 clean:
 	rm -f $(PROGRAMS) *.o
-
