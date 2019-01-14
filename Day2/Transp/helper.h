@@ -1,7 +1,7 @@
 #ifndef TRANSP_HELPER
 #define TRANSP_HELPER
 
-#define DEVICE_ID 0
+#define DEVICE_ID 1
 
 typedef enum { 
     NAIVE_TRANSP,
@@ -160,9 +160,6 @@ void freeOclControl() {
 
     //fprintf(stderr, "Releasing Command Queue ...\n");
     clReleaseCommandQueue(ctrl.queue);
-
-    //fprintf(stderr, "Releasing Devices ...\n");
-    free(ctrl.device);
         
     //fprintf(stderr, "Releasing GPU context ...\n");
     clReleaseContext(ctrl.ctx);
@@ -173,9 +170,9 @@ void freeOclBuffKers() {
     clReleaseKernel(kers.naiveTransp);
     clReleaseKernel(kers.coalsTransp);
     clReleaseKernel(kers.optimTransp);
-//    clReleaseKernel(kers.naiveProgrm);
-//    clReleaseKernel(kers.coalsProgrm);
-//    clReleaseKernel(kers.optimProgrm);
+    clReleaseKernel(kers.naiveProgrm);
+    clReleaseKernel(kers.coalsProgrm);
+    clReleaseKernel(kers.optimProgrm);
 
 
     //fprintf(stderr, "Releasing GPU buffers ...\n");

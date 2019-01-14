@@ -1,6 +1,5 @@
 CC?=gcc
 CFLAGS?=-std=c99 -O3 -Wall -Wextra -pedantic -Wno-unused-function
-LDFLAGS?=-lOpenCL -lm
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)

@@ -4,7 +4,7 @@
 #include "bridge.h"
 
 #define TILE   16
-#define CHUNK  16
+#define CHUNK  16   // for AMD use 8; for NVIDIA 16
 #define HEIGHT 67537
 #define WIDTH  128
 
