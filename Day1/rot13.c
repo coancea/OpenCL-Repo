@@ -48,7 +48,14 @@ int main() {
   // Enqueue the rot13 kernel.
   size_t local_work_size[1] = { 256 };
   size_t global_work_size[1] = { div_rounding_up(n, local_work_size[0]) * local_work_size[0] };
-  clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
+  clEnqueueNDRangeKernel(queue,
+                         rot13_k, // The kernel.
+                         1, // Number of grid dimensions.
+                         NULL, // Must always be NULL (supposed to be
+                               // for grid offset).
+                         global_work_size,
+                         local_work_size,
+                         0, NULL, NULL);
 
   // Wait for the kernel to stop.
   OPENCL_SUCCEED(clFinish(queue));

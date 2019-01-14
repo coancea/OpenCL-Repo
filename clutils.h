@@ -194,7 +194,6 @@ static void opencl_init_command_queue(unsigned int platform_index, unsigned int 
   assert(device_index < num_devices);
   *device = platform_devices[device_index];
 
-
   // NVIDIA's OpenCL requires the platform property
   cl_context_properties properties[] = {
     CL_CONTEXT_PLATFORM,

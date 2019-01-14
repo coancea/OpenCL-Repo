@@ -39,12 +39,12 @@ int main(int argc, char** argv) {
   OPENCL_SUCCEED(error);
 
   // Write the input to the kernel, asynchronously.
-  clEnqueueWriteBuffer(queue, input,
-                       CL_FALSE, // Non-blocking write
-                       0, // Offset in 'input'.
-                       n, // Number of bytes to copy.
-                       string, // Where to copy from.
-                       0, NULL, NULL);
+  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, input,
+                                      CL_FALSE, // Non-blocking write
+                                      0, // Offset in 'input'.
+                                      n, // Number of bytes to copy.
+                                      string, // Where to copy from.
+                                      0, NULL, NULL));
 
   // Wait for the write to succeed.
   OPENCL_SUCCEED(clFinish(queue));
