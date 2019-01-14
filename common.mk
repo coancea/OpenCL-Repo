@@ -18,6 +18,9 @@ all: $(PROGRAMS)
 %: %.c ../clutils.h
 	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
 
+run: $(PROGRAMS)
+	@for prog in $(PROGRAMS); do echo "./$$prog"; ./$$prog; done
+
 .PHONY: clean
 
 clean:
