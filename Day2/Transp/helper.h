@@ -92,8 +92,8 @@ void initTranspKernels() {
         const size_t local_size = TILE * (TILE+1) * sizeof(real);
         kers.coalsTransp = clCreateKernel(ctrl.prog, "coalsTransp", &error);
         OPENCL_SUCCEED(error);
-        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
-        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
+        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dAtr);
+        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dBtr);
         clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
         clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
         clSetKernelArg(kers.coalsTransp, 4, local_size, NULL); // reserve space for local memory
@@ -108,6 +108,39 @@ void initTranspKernels() {
         clSetKernelArg(kers.optimTransp, 2, sizeof(cl_int), &buffs.height);
         clSetKernelArg(kers.optimTransp, 3, sizeof(cl_int), &buffs.width);
         clSetKernelArg(kers.optimTransp, 4, local_size, NULL); // reserve space for local memory
+    }
+}
+
+void initProgramKernels() {
+    cl_int error = CL_SUCCESS;
+    
+    { // naive
+        kers.naiveProgrm = clCreateKernel(ctrl.prog, "naiveProgrm", &error);
+        OPENCL_SUCCEED(error);
+        clSetKernelArg(kers.naiveProgrm, 0, sizeof(cl_mem), &buffs.dA);
+        clSetKernelArg(kers.naiveProgrm, 1, sizeof(cl_mem), &buffs.dB);
+        clSetKernelArg(kers.naiveProgrm, 2, sizeof(cl_int), &buffs.height);
+        clSetKernelArg(kers.naiveProgrm, 3, sizeof(cl_int), &buffs.width);
+    }
+
+    { // coalesced
+        kers.coalsProgrm = clCreateKernel(ctrl.prog, "coalsProgrm", &error);
+        OPENCL_SUCCEED(error);
+        clSetKernelArg(kers.coalsProgrm, 0, sizeof(cl_mem), &buffs.dAtr);
+        clSetKernelArg(kers.coalsProgrm, 1, sizeof(cl_mem), &buffs.dBtr);
+        clSetKernelArg(kers.coalsProgrm, 2, sizeof(cl_int), &buffs.height);
+        clSetKernelArg(kers.coalsProgrm, 3, sizeof(cl_int), &buffs.width);
+    }
+
+    { // coalesced
+        const size_t local_size = CHUNK * TILE * TILE * sizeof(real);
+        kers.optimProgrm = clCreateKernel(ctrl.prog, "optimProgrm", &error);
+        OPENCL_SUCCEED(error);
+        clSetKernelArg(kers.optimProgrm, 0, sizeof(cl_mem), &buffs.dA);
+        clSetKernelArg(kers.optimProgrm, 1, sizeof(cl_mem), &buffs.dB);
+        clSetKernelArg(kers.optimProgrm, 2, sizeof(cl_int), &buffs.height);
+        clSetKernelArg(kers.optimProgrm, 3, sizeof(cl_int), &buffs.width);
+        clSetKernelArg(kers.optimProgrm, 4, local_size, NULL); // reserve space for local memory
     }
 }
 
