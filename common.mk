@@ -6,16 +6,16 @@ CFLAGS?=-std=c99 -O3 -Wall -Wextra -pedantic -Wno-unused-function
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)
-LDFLAGS?=-framework OpenCL
+LDFLAGS?=-D DEVICE_ID=1 -framework OpenCL -lm
 else
-LDFLAGS?=-lOpenCL
+LDFLAGS?=-D DEVICE_ID=0 -lOpenCL -lm
 endif
 
-
+INCLUDES?=
 
 all: $(PROGRAMS)
 
-%: %.c ../clutils.h
+%: %.c $(INCLUDES)
 	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
 
 run: $(PROGRAMS)
