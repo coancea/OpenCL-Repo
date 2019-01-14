@@ -3,7 +3,7 @@ CFLAGS?=-std=c99 -O3 -Wall -Wextra -pedantic -Wno-unused-function
 
 OS=$(shell uname -s)
 ifeq ($(OS),Darwin)
-LDFLAGS?=-framework OpenCL -lm
+LDFLAGS?=-D DEVICE_ID=1 -framework OpenCL -lm
 else
 LDFLAGS?=-lOpenCL -lm
 endif

@@ -1,8 +1,6 @@
 #ifndef TRANSP_HELPER
 #define TRANSP_HELPER
 
-#define DEVICE_ID 0
-
 typedef enum { 
     NAIVE_TRANSP,
     COALS_TRANSP,
