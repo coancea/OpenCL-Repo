@@ -7,26 +7,18 @@ void do_fibfact_on_device(cl_context ctx, cl_command_queue queue,
                           cl_int *ns_host, cl_int *ops_host) {
   cl_int error = CL_SUCCESS;
 
-  cl_mem ns_dev = clCreateBuffer(ctx, CL_MEM_READ_ONLY, k*sizeof(cl_int), NULL, &error);
+  // Instead of using clEnqueueWriteBuffer(), we use
+  // CL_MEM_COPY_HOST_PTR to initialise the memory objects from host
+  // memory.
+
+  cl_mem ns_dev = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                 k*sizeof(cl_int), ns_host, &error);
   OPENCL_SUCCEED(error);
-  cl_mem ops_dev = clCreateBuffer(ctx, CL_MEM_READ_ONLY, k*sizeof(cl_int), NULL, &error);
+  cl_mem ops_dev = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                  k*sizeof(cl_int), ops_host, &error);
   OPENCL_SUCCEED(error);
   cl_mem res_dev = clCreateBuffer(ctx, CL_MEM_READ_ONLY, k*sizeof(cl_float), NULL, &error);
   OPENCL_SUCCEED(error);
-
-  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, ns_dev,
-                                      CL_FALSE,
-                                      0,
-                                      k*sizeof(int),
-                                      ns_host,
-                                      0, NULL, NULL));
-
-  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, ops_dev,
-                                      CL_FALSE,
-                                      0,
-                                      k*sizeof(int),
-                                      ops_host,
-                                      0, NULL, NULL));
 
   OPENCL_SUCCEED(clFinish(queue));
 

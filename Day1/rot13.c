@@ -20,17 +20,19 @@ int main() {
 
   // Now we are ready to run.
 
-  const char *string = "Hello, World!\n";
+  char *string = "Hello, World!\n";
   cl_int n = strlen(string);
 
   // Note: CL_MEM_READ_ONLY is only a restriction on kernels, not the host.
-  cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY, n, NULL, &error);
+  cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY |  CL_MEM_COPY_HOST_PTR,
+                                n, string, &error);
   OPENCL_SUCCEED(error);
 
   cl_mem output = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, n, NULL, &error);
   OPENCL_SUCCEED(error);
 
-  // Write the input to the kernel, asynchronously.
+  // Write the input to the kernel, asynchronously.  Alternatively, we
+  // could use the CL_MEM_COPY_HOST_PTR flag for clCreateBuffer().
   clEnqueueWriteBuffer(queue, input,
                        CL_FALSE, // Non-blocking write
                        0, // Offset in 'input'.
