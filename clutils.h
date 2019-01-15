@@ -173,6 +173,30 @@ static void opencl_succeed_fatal(unsigned int ret,
 // Terminate the process with an error message unless the argument is CL_SUCCESS.
 #define OPENCL_SUCCEED(e) opencl_succeed_fatal(e, #e, __FILE__, __LINE__)
 
+static char* opencl_platform_name(cl_platform_id platform) {
+  size_t req_bytes;
+  char *name;
+
+  OPENCL_SUCCEED(clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, NULL, &req_bytes));
+
+  name = malloc(req_bytes);
+  OPENCL_SUCCEED(clGetPlatformInfo(platform, CL_PLATFORM_NAME, req_bytes, name, NULL));
+
+  return name;
+}
+
+static char* opencl_device_name(cl_device_id device) {
+  size_t req_bytes;
+  char *name;
+
+  OPENCL_SUCCEED(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, NULL, &req_bytes));
+
+  name = malloc(req_bytes);
+  OPENCL_SUCCEED(clGetDeviceInfo(device, CL_DEVICE_NAME, req_bytes, name, NULL));
+
+  return name;
+}
+
 // Create a context and command queue for the given platform and
 // device ID.  Terminates the program on error.
 static void opencl_init_command_queue(unsigned int platform_index, unsigned int device_index,
@@ -193,6 +217,12 @@ static void opencl_init_command_queue(unsigned int platform_index, unsigned int 
 
   assert(device_index < num_devices);
   *device = platform_devices[device_index];
+
+  char *platform_name = opencl_platform_name(platform);
+  char *device_name = opencl_device_name(*device);
+  printf("Using platform: %s\nUsing device: %s\n", platform_name, device_name);
+  free(platform_name);
+  free(device_name);
 
   // NVIDIA's OpenCL requires the platform property
   cl_context_properties properties[] = {
