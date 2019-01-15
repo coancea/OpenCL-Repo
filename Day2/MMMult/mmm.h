@@ -1,8 +1,6 @@
 #ifndef MMM_HELPER
 #define MMM_HELPER
 
-#define DEVICE_ID 0 //IF two GPU devices then adjust, e.g., to 1
-
 typedef struct OCLControl {
     cl_context          ctx;          // OpenCL context
     cl_device_id        device;       // OpenCL device
