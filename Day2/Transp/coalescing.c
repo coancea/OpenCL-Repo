@@ -6,7 +6,7 @@
 #define TILE   16
 #define CHUNK  16
 #define HEIGHT 67537
-#define WIDTH  128
+#define WIDTH  96
 
 #define RUNS_CPU 1
 #define RUNS_GPU 75
