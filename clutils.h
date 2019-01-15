@@ -224,7 +224,7 @@ static void opencl_init_command_queue_default(cl_device_id *device, cl_context *
 }
 
 static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
-                                       const char *file, const char *options) {
+                                       const char *file, const char *options_fmt, ...) {
   cl_int error;
   const char *kernel_src = slurp_file(file);
   assert(kernel_src != NULL);
@@ -233,6 +233,15 @@ static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
   cl_program program = clCreateProgramWithSource(ctx, 1, &kernel_src, &src_len, &error);
   OPENCL_SUCCEED(error);
 
+  // Construct the actual options string, which involves some varargs
+  // magic.
+  va_list vl;
+  va_start(vl, options_fmt);
+  size_t needed = 1 + vsnprintf(NULL, 0, options_fmt, vl);
+  char *options = malloc(needed);
+  va_start(vl, options_fmt); /* Must re-init. */
+  vsnprintf(options, needed, options_fmt, vl);
+
   // Here we are a bit more generous than usual and do not terminate
   // the process immediately on a build error.  Instead, we print the
   // error messages first.
@@ -240,6 +249,7 @@ static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
   if (error != CL_SUCCESS && error != CL_BUILD_PROGRAM_FAILURE) {
     OPENCL_SUCCEED(error);
   }
+  free(options);
 
   cl_build_status build_status;
   OPENCL_SUCCEED(clGetProgramBuildInfo(program,
