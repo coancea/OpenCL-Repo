@@ -33,10 +33,14 @@ void goldTransp(real* A, real* B, uint32_t height, uint32_t width) {
   }
 
   int64_t aft = get_wall_time();
-  int64_t elapsed_us = aft-bef;
-
-  printf("Golden (sequential) transposition average runtime: %dμs (across %d runs)\n",
-         (uint32_t)(elapsed_us/RUNS_CPU), RUNS_CPU);
+  int64_t elapsed = aft-bef;
+  {
+    double microsecPerTransp = ((double)elapsed)/RUNS_CPU; 
+    double bytesaccessed = 2 * height * width * sizeof(real); // one read + one write
+    double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
+    printf("Golden (sequential) transposition average runtime: %dμs (across %d runs), GBytes/sec: %.2f\n",
+            (uint32_t)(elapsed/RUNS_CPU), RUNS_CPU, gigaBytesPerSec);
+  }
 }
 
 void goldProgrm(real* A, real* B, const uint32_t height, const uint32_t width) {
@@ -56,10 +60,15 @@ void goldProgrm(real* A, real* B, const uint32_t height, const uint32_t width) {
   }
 
   int64_t aft = get_wall_time();
-  int64_t elapsed_us = aft-bef;
+  int64_t elapsed = aft-bef;
 
-  printf("Golden (sequential) program average runtime: %dμs (across %d runs)\n",
-         (uint32_t)(elapsed_us/RUNS_CPU), RUNS_CPU);
+  {
+    double microsecPerTransp = ((double)elapsed)/RUNS_CPU; 
+    double bytesaccessed = 2 * height * width * sizeof(real); // one read + one write
+    double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
+    printf("Golden (sequential) program average runtime: %dμs (across %d runs), GBytes/sec: %.2f\n",
+            (uint32_t)(elapsed/RUNS_CPU), RUNS_CPU, gigaBytesPerSec);
+  }
 }
 
 bool validate(real* A, real* B, uint32_t sizeAB){
@@ -75,6 +84,41 @@ bool validate(real* A, real* B, uint32_t sizeAB){
 inline size_t mkGlobalDim(const uint32_t pardim, const uint32_t T) {
     return ((pardim + T - 1) / T) * T;
 }
+
+void runMemCopy() {
+    const size_t localWorkSize  = TILE*TILE;
+    const size_t globalWorkSize = mkGlobalDim(buffs.totlen , TILE*TILE );
+    cl_int ciErr1 = CL_SUCCESS;
+
+    // make a dry run
+    for (int32_t i=0; i<1; i++) { 
+        ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.mem_cpy_ker, 1, NULL,
+                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        clFinish(ctrl.queue);
+        OPENCL_SUCCEED(ciErr1);
+    }
+
+    { // timing runs
+        int64_t elapsed, aft, bef = get_wall_time();
+
+        for (int32_t i = 0; i < RUNS_GPU; i++) {
+            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.mem_cpy_ker, 1, NULL,
+                                             &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        }
+        clFinish(ctrl.queue);
+
+        aft = get_wall_time();
+        elapsed = aft - bef;
+        OPENCL_SUCCEED(ciErr1);
+        {
+            double microsecPerTransp = ((double)elapsed)/RUNS_GPU; 
+            double bytesaccessed = 2 * buffs.height * buffs.width * sizeof(real); // one read + one write
+            double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
+            fprintf(stdout, "GPU Memcopy-Straight runs in: %ld microseconds on GPU; N: %d, GBytes/sec:%.2f\n", 
+                    elapsed/RUNS_GPU, buffs.totlen, gigaBytesPerSec);
+        }
+    }
+} 
 
 void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
     size_t localWorkSize[2];
@@ -285,6 +329,9 @@ void testForSizes( const uint32_t height
     initOclBuffers ( height, width, hA );
     initTranspKernels();
 
+    // run memcopy kernel
+    runMemCopy();
+
     // run the gpu versions of transpose
     runGPUverTransp(NAIVE_TRANSP, hB, hdB);
     runGPUverTransp(COALS_TRANSP, hB, hdB);
@@ -300,6 +347,7 @@ void testForSizes( const uint32_t height
     runGPUnaive_or_optProgram(NAIVE_PROGRM, hB, hdB);
     runGPUcoalsProgram(hB, hdB);
     runGPUnaive_or_optProgram(OPTIM_PROGRM, hB, hdB);
+    printf("\n");
     // free Ocl Kernels and Buffers
     freeOclBuffKers();
     

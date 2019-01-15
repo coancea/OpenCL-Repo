@@ -21,6 +21,7 @@ typedef struct OCLControl {
 } OclControl;
 
 typedef struct OCLKernels {
+    cl_kernel mem_cpy_ker;  // simple memcopy kernel
     cl_kernel naiveTransp;  // naive transposition
     cl_kernel coalsTransp;  // coalesced transposition
     cl_kernel optimTransp;  // coalesced + chunked transposition
@@ -33,6 +34,7 @@ typedef struct OCLBuffers {
     // matrix shapes
     uint32_t height;
     uint32_t width;
+    uint32_t totlen;
 
     // input and result matrices (global memory)
     cl_mem  dA;     // heigth x width
@@ -73,11 +75,20 @@ void initOclBuffers ( const uint32_t height
 
     buffs.height = height;
     buffs.width  = width;
+    buffs.totlen = height*width;
 }
 
 void initTranspKernels() {
     cl_int error = CL_SUCCESS;
     
+    { // memcopy
+        kers.mem_cpy_ker = clCreateKernel(ctrl.prog, "memcpy_simple", &error);
+        OPENCL_SUCCEED(error);
+        clSetKernelArg(kers.mem_cpy_ker, 0, sizeof(uint32_t), (void*)&buffs.totlen);
+        clSetKernelArg(kers.mem_cpy_ker, 1, sizeof(cl_mem),   (void*)&buffs.dA);
+        clSetKernelArg(kers.mem_cpy_ker, 2, sizeof(cl_mem),   (void*)&buffs.dB);
+    }
+
     { // naive
         kers.naiveTransp = clCreateKernel(ctrl.prog, "naiveTransp", &error);
         OPENCL_SUCCEED(error);
@@ -166,6 +177,7 @@ void freeOclControl() {
 
 void freeOclBuffKers() {
     //fprintf(stderr, "Releasing Kernels...\n");
+    clReleaseKernel(kers.mem_cpy_ker);
     clReleaseKernel(kers.naiveTransp);
     clReleaseKernel(kers.coalsTransp);
     clReleaseKernel(kers.optimTransp);

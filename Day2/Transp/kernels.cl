@@ -7,6 +7,17 @@ typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
 
+__kernel void memcpy_simple ( 
+        uint32_t            N,
+        __global real*      d_inp,      // read-only,  [N]
+        __global real*      d_out       // write-only, [N]
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < N) {
+        d_out[gid] = d_inp[gid];
+    }
+}
+
 __kernel void naiveTransp( __global real* A
                          , __global real* B
                          , uint32_t height
