@@ -1,5 +1,4 @@
 #include "../../clutils.h"
-#include <stdbool.h>
 #include <math.h>
 #include "bridge.h"
 
@@ -71,14 +70,14 @@ void goldProgrm(real* A, real* B, const uint32_t height, const uint32_t width) {
   }
 }
 
-bool validate(real* A, real* B, uint32_t sizeAB){
+void validate(real* A, real* B, uint32_t sizeAB){
     for(uint32_t i = 0; i < sizeAB; i++)
       if (fabs(A[i] - B[i]) > 0.00001){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
-        return false;
+        return;
       }
     printf("VALID RESULT!\n");
-    return true;
+    return;
 }
 
 inline size_t mkGlobalDim(const uint32_t pardim, const uint32_t T) {

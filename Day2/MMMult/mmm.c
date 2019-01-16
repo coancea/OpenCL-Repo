@@ -1,5 +1,4 @@
 #include "../../clutils.h"
-#include <stdbool.h>
 #include <math.h>
 #include "bridge.h"
 #include "mmm.h"
@@ -48,14 +47,13 @@ void goldMMM(real* A, real* B, real* C, uint32_t rowsA, uint32_t colsB, uint32_t
          (uint32_t)(elapsed_us/RUNS_CPU), RUNS_CPU);
 }
 
-bool validate(real* A, real* B, uint32_t sizeAB){
+void validate(real* A, real* B, uint32_t sizeAB){
     for(uint32_t i = 0; i < sizeAB; i++)
       if (fabs(A[i] - B[i]) > 0.0005){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
-        return false;
+        return;
       }
     printf("VALID RESULT!\n");
-    return true;
 }
 
 inline size_t mkGlobalDim(const uint32_t pardim, const uint32_t T) {
