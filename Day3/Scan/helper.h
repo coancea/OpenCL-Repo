@@ -12,13 +12,13 @@ typedef struct OCLKernels {
     cl_kernel memCpy; // Memcopy Kernel
 
     cl_kernel grpRed;      // reduction-phase kernel for straight scan
-//    cl_kernel grpSgmRed;   // reduction-phase kernel for segmented scan
+    cl_kernel grpSgmRed;   // reduction-phase kernel for segmented scan
 
     cl_kernel shortScan;
-//    cl_kernel shortSgmScan;
+    cl_kernel shortSgmScan;
 
     cl_kernel grpScan;     // inclusive-scan kernel
-//    cl_kernel grpSgmScan;  // segmented-scan kernel (also inclusive)
+    cl_kernel grpSgmScan;  // segmented-scan kernel (also inclusive)
 } OclKernels;
 
 typedef struct OCLBuffers {
@@ -89,10 +89,19 @@ void initKernels() {
     kers.grpRed = clCreateKernel(ctrl.prog, "redPhaseKer", &error);
     OPENCL_SUCCEED(error);
 
+    kers.grpSgmRed = clCreateKernel(ctrl.prog, "redPhaseSgmKer", &error);
+    OPENCL_SUCCEED(error);
+
     kers.shortScan = clCreateKernel(ctrl.prog, "shortScanKer", &error);
     OPENCL_SUCCEED(error);
 
+    kers.shortSgmScan = clCreateKernel(ctrl.prog, "shortSgmScanKer", &error);
+    OPENCL_SUCCEED(error);
+
     kers.grpScan = clCreateKernel(ctrl.prog, "scanPhaseKer", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.grpSgmScan = clCreateKernel(ctrl.prog, "scanPhaseSgmKer", &error);
     OPENCL_SUCCEED(error);
 }
 
@@ -110,6 +119,9 @@ void freeOclBuffKers() {
     clReleaseKernel(kers.grpRed);
     clReleaseKernel(kers.shortScan);
     clReleaseKernel(kers.grpScan);
+    clReleaseKernel(kers.grpSgmRed);
+    clReleaseKernel(kers.shortSgmScan);
+    clReleaseKernel(kers.grpSgmScan);
 
     //fprintf(stderr, "Releasing GPU buffers ...\n");
     clReleaseMemObject(buffs.inp);

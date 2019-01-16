@@ -12,8 +12,8 @@ typedef struct SgmScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements
     cl_mem        flg;  // input flags holding `N` bytes
-    cl_mem        tmp_vals;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` elements
-    cl_mem        tmp_flgs;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` bytes
+    cl_mem        tmp_val;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` elements
+    cl_mem        tmp_flg;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` bytes
     cl_mem        out;  // result array holding `N` elements
 } SgmScanBuffs;
 
@@ -22,6 +22,10 @@ uint32_t getScanNumGroups(const uint32_t N) {
     uint32_t num1 = (N + min_elem_per_group - 1) / min_elem_per_group;
     return (num1 < NUM_GROUPS_SCAN) ? num1 : NUM_GROUPS_SCAN;
 }
+
+/**********************/
+/*** Inclusive Scan ***/
+/**********************/
 
 cl_int runScan(IncScanBuffs arrs) {
     cl_int error = CL_SUCCESS;
@@ -93,6 +97,96 @@ void profileScan(IncScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         double bytesaccessed = 2 * arrs.N * sizeof(ElTp); // one read + one write
         double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
         printf("GPU Inclusive-Scan runs in: %ld microseconds; N: %d; GBytes/sec: %.2f  ...",
+                elapsed/RUNS_GPU, buffs.N, gigaBytesPerSec);
+    }
+
+    { // transfer result to CPU and validate
+        gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
+        validate(ref_arr, res_arr, arrs.N);
+        memset(res_arr, 0, arrs.N*sizeof(ElTp));
+    }
+}
+
+/**********************/
+/*** Segmented Scan ***/
+/**********************/
+
+cl_int runSgmScan(SgmScanBuffs arrs) {
+    cl_int error = CL_SUCCESS;
+    const uint32_t num_groups      = getScanNumGroups(arrs.N);
+    const uint32_t elems_per_group = (arrs.N + num_groups - 1) / num_groups;
+
+    //printf("Number of groups: %d, Number elements per group: %d\n\n", num_groups, elems_per_group);
+
+    const size_t   local_length   = WORKGROUP_SIZE * ELEMS_PER_THREAD;
+    const size_t   localWorkSize  = WORKGROUP_SIZE;
+    const size_t   globalWorkSize = WORKGROUP_SIZE * num_groups; // elems_per_group 
+
+    {   // run intra-group reduction kernel
+        error |= clSetKernelArg(kers.grpSgmRed, 0, sizeof(uint32_t), (void *)&arrs.N);
+        error |= clSetKernelArg(kers.grpSgmRed, 1, sizeof(uint32_t), (void *)&elems_per_group);
+        error |= clSetKernelArg(kers.grpSgmRed, 2, sizeof(cl_mem), (void*)&arrs.flg);
+        error |= clSetKernelArg(kers.grpSgmRed, 3, sizeof(cl_mem), (void*)&arrs.inp);
+        error |= clSetKernelArg(kers.grpSgmRed, 4, sizeof(cl_mem), (void*)&arrs.tmp_flg);
+        error |= clSetKernelArg(kers.grpSgmRed, 5, sizeof(cl_mem), (void*)&arrs.tmp_val);
+        error |= clSetKernelArg(kers.grpSgmRed, 6, local_length * sizeof(ElTp), NULL);
+
+        error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpSgmRed, 1, NULL,
+                                        &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+    }
+
+    {   // run scan on the group resulted from the group-reduction kernel
+        const size_t  localWorkSize = NUM_GROUPS_SCAN;
+        error |= clSetKernelArg(kers.shortSgmScan, 0, sizeof(uint32_t), (void *)&num_groups);
+        error |= clSetKernelArg(kers.shortSgmScan, 1, sizeof(cl_mem), (void*)&arrs.tmp_flg); // input
+        error |= clSetKernelArg(kers.shortSgmScan, 2, sizeof(cl_mem), (void*)&arrs.tmp_val); // input
+        error |= clSetKernelArg(kers.shortSgmScan, 3, NUM_GROUPS_SCAN * sizeof(ElTp), NULL);
+        error |= clSetKernelArg(kers.shortSgmScan, 4, NUM_GROUPS_SCAN * sizeof(uint32_t), NULL);
+
+        error |= clEnqueueNDRangeKernel(ctrl.queue, kers.shortSgmScan, 1, NULL,
+                                        &localWorkSize, &localWorkSize, 0, NULL, NULL);
+    }
+
+    {   // run intra-block scan kernel while accumulating from the result of the previous step
+        error |= clSetKernelArg(kers.grpSgmScan, 0, sizeof(uint32_t), (void *)&arrs.N);
+        error |= clSetKernelArg(kers.grpSgmScan, 1, sizeof(uint32_t), (void *)&elems_per_group);
+        error |= clSetKernelArg(kers.grpSgmScan, 2, sizeof(cl_mem), (void*)&arrs.flg);
+        error |= clSetKernelArg(kers.grpSgmScan, 3, sizeof(cl_mem), (void*)&arrs.inp);
+        error |= clSetKernelArg(kers.grpSgmScan, 4, sizeof(cl_mem), (void*)&arrs.tmp_flg);
+        error |= clSetKernelArg(kers.grpSgmScan, 5, sizeof(cl_mem), (void*)&arrs.tmp_val);
+        error |= clSetKernelArg(kers.grpSgmScan, 6, sizeof(cl_mem), (void*)&arrs.out);
+        error |= clSetKernelArg(kers.grpSgmScan, 7, local_length * sizeof(ElTp), NULL);
+
+        error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpSgmScan, 1, NULL,
+                                        &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+    }
+    return error;
+}
+
+void profileSgmScan(SgmScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
+    int64_t elapsed, aft, bef;
+    cl_int error = CL_SUCCESS;
+
+    // dry run
+    error |= runSgmScan(arrs);
+    clFinish(ctrl.queue);
+    OPENCL_SUCCEED(error);
+
+    // measure timing
+    bef = get_wall_time();
+    for (int32_t i = 0; i < RUNS_GPU; i++) {
+        error |= runSgmScan(arrs);
+    }
+    clFinish(ctrl.queue);
+    aft = get_wall_time();
+    elapsed = aft - bef;
+    OPENCL_SUCCEED(error);
+
+    {
+        double microsecPerTransp = ((double)elapsed)/RUNS_GPU; 
+        double bytesaccessed = 2 * arrs.N * sizeof(ElTp); // one read + one write
+        double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
+        printf("GPU Segmented-Scan runs in: %ld microseconds; N: %d; GBytes/sec: %.2f  ...",
                 elapsed/RUNS_GPU, buffs.N, gigaBytesPerSec);
     }
 

@@ -1,16 +1,16 @@
 #include "../../clutils.h"
 #include <math.h>
 
-#define NUM_GROUPS_SCAN     256
+#define NUM_GROUPS_SCAN     1024
 #define WORKGROUP_SIZE      256
-#define RUNS_GPU            200
+#define RUNS_GPU            300
 #define ELEMS_PER_THREAD    7
 
 #include "bridge.h"
 #include "helper.h"
 #include "scan.h"
 
-void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
+void testIncScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
     // init buffers and kernels arguments
     initOclBuffers(N, cpu_flg, cpu_inp);
     initKernels();
@@ -21,7 +21,7 @@ void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     // run memcopy kernel
     profileMemcpy();
 
-    { // compute single-passscan on GPUs
+    { // inclusive scan on GPU
         IncScanBuffs arrs;
         arrs.N   = N;
         arrs.inp = buffs.inp;
@@ -30,7 +30,21 @@ void testOnlyScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
         profileScan(arrs, cpu_ref, cpu_out);
     }
 
-    printf("\n");
+    //printf("\n");
+    // compute sequential (golden) segmented scan version 
+    goldenScan(1, N, cpu_inp, cpu_flg, cpu_ref);
+
+    { // segmented inclusive scan on GPU
+        SgmScanBuffs arrs;
+        arrs.N   = N;
+        arrs.inp = buffs.inp;
+        arrs.flg = buffs.flg;
+        arrs.out = buffs.out;
+        arrs.tmp_val = buffs.tmp_val;
+        arrs.tmp_flg = buffs.tmp_flg;
+        profileSgmScan(arrs, cpu_ref, cpu_out);
+    }
+    printf("\n\n");
 
     // Release GPU Buffer/Kernels resources!!!
     freeOclBuffKers();
@@ -48,10 +62,10 @@ int main() {
     mkRandomDataset(N, cpu_inp, cpu_flg);
     initOclControl();
 
-    testOnlyScan(N/512, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testOnlyScan(N/64, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testOnlyScan(N/8, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testOnlyScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testIncScan(N/512, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testIncScan(N/64, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testIncScan(N/8, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testIncScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     freeOclControl();
     free(cpu_inp);
