@@ -497,3 +497,41 @@ __kernel void scanPhaseSgmKer (
     }
 }
 
+/*************************/
+/*** Partition Kernels ***/ 
+/*************************/
+__kernel void mapPredPartKer(  
+        uint32_t            N,
+        __global ElTp*      inp,    // read-only,    [N]
+        __global uint32_t*  tfs,    // write-only,   [N]
+        __global uint32_t*  ffs     // write-only,   [N]
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < N) {
+        uint32_t v = pred(inp[gid]);
+        tfs[gid] = v;
+        ffs[gid] = 1 - v;
+    }
+}
+
+__kernel void scatterPartKer( 
+        uint32_t            N,
+        __global ElTp*      inp,    // read-only,    [N]
+        __global uint32_t*  isT,    // read-only,    [N]
+        __global uint32_t*  isF,    // read-only,    [N]
+        __global ElTp*      out     // write-only,   [N]
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < N) {
+        ElTp el = inp[gid];
+        uint32_t v = pred(el);
+        if (v == 1) { // likely expensive due to divergence
+            uint32_t tind = isT[gid];
+            out[tind-1] = el;
+        } else {
+            uint32_t i    = isT[N-1];
+            uint32_t find = isF[gid] + i;
+            out[find-1] = el;
+        }
+    } 
+}

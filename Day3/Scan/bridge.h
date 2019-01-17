@@ -22,3 +22,9 @@ inline FlgTuple binOpFlg(FlgTuple t1, FlgTuple t2) {
     return res;
 }
 
+inline uint32_t pred(int32_t k) {
+//    int32_t kk = k;
+//    if (k < 0) { kk = 0 - k; }
+//    return (1 - (kk % 2));
+    return (1 - (k & 1));
+}

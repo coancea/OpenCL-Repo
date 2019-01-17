@@ -19,6 +19,9 @@ typedef struct OCLKernels {
 
     cl_kernel grpScan;     // inclusive-scan kernel
     cl_kernel grpSgmScan;  // segmented-scan kernel (also inclusive)
+
+    cl_kernel mapPredPart;     // partition2 kernel
+    cl_kernel scatterPart;     // partition2 kernel
 } OclKernels;
 
 typedef struct OCLBuffers {
@@ -102,6 +105,12 @@ void initKernels() {
     OPENCL_SUCCEED(error);
 
     kers.grpSgmScan = clCreateKernel(ctrl.prog, "scanPhaseSgmKer", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.mapPredPart= clCreateKernel(ctrl.prog, "mapPredPartKer", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.scatterPart= clCreateKernel(ctrl.prog, "scatterPartKer", &error);
     OPENCL_SUCCEED(error);
 }
 

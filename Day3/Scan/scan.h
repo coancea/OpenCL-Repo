@@ -4,7 +4,7 @@
 typedef struct IncScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements 
-    cl_mem        tmp;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` elements
+    cl_mem        tmp;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` elements
     cl_mem        out;  // result array holding `N` elements
 } IncScanBuffs;
 
@@ -12,8 +12,8 @@ typedef struct SgmScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements
     cl_mem        flg;  // input flags holding `N` bytes
-    cl_mem        tmp_val;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` elements
-    cl_mem        tmp_flg;  // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` bytes
+    cl_mem        tmp_val;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` elements
+    cl_mem        tmp_flg;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` bytes
     cl_mem        out;  // result array holding `N` elements
 } SgmScanBuffs;
 
@@ -195,7 +195,7 @@ void profileSgmScan(SgmScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
     }
-} 
+}
 
 void goldenScan (uint8_t is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_flags, ElTp* cpu_out) {
     int64_t elapsed, aft, bef = get_wall_time();
@@ -218,7 +218,7 @@ void goldenScan (uint8_t is_sgm, const uint32_t N, ElTp* cpu_inp, uint8_t* cpu_f
         double microsecPerTransp = (double)elapsed; 
         double bytesaccessed = 2 * N * sizeof(ElTp); // one read + one write
         double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
-        printf("Sequential golden runs in: %ld microseconds; N: %d; GBytes/sec: %.2f\n",
+        printf("Sequential Golden Scan runs in: %ld microseconds; N: %d; GBytes/sec: %.2f\n",
                 elapsed, N, gigaBytesPerSec);
     }
 }

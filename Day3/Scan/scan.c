@@ -9,8 +9,9 @@
 #include "bridge.h"
 #include "helper.h"
 #include "scan.h"
+#include "partition2.h"
 
-void testIncScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
+void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
     // init buffers and kernels arguments
     initOclBuffers(N, cpu_flg, cpu_inp);
     initKernels();
@@ -30,7 +31,6 @@ void testIncScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_re
         profileScan(arrs, cpu_ref, cpu_out);
     }
 
-    //printf("\n");
     // compute sequential (golden) segmented scan version 
     goldenScan(1, N, cpu_inp, cpu_flg, cpu_ref);
 
@@ -44,7 +44,35 @@ void testIncScan(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_re
         arrs.tmp_flg = buffs.tmp_flg;
         profileSgmScan(arrs, cpu_ref, cpu_out);
     }
-    printf("\n\n");
+    
+    goldenPartition(N, cpu_inp, cpu_ref);
+
+    { // partition2
+        cl_int error = CL_SUCCESS;
+        uint32_t size = N*sizeof(uint32_t);
+        PartitionBuffs arrs;
+        arrs.N = N;
+        arrs.inp = buffs.inp;
+        arrs.tmp = buffs.tmp_val;
+        arrs.out = buffs.out;
+        // need more temporary buffers
+        arrs.tfs = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE, size, NULL, &error);
+        OPENCL_SUCCEED(error);
+        arrs.ffs = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE, size, NULL, &error);
+        OPENCL_SUCCEED(error);
+        arrs.isT = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE, size, NULL, &error);
+        OPENCL_SUCCEED(error);
+        arrs.isF = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE, size, NULL, &error);
+        OPENCL_SUCCEED(error);
+
+        profilePartition(arrs, cpu_ref, cpu_out);
+
+        clReleaseMemObject(arrs.tfs);
+        clReleaseMemObject(arrs.ffs);
+        clReleaseMemObject(arrs.isT);
+        clReleaseMemObject(arrs.isF);
+    }
+    printf("\n");
 
     // Release GPU Buffer/Kernels resources!!!
     freeOclBuffKers();
@@ -62,10 +90,10 @@ int main() {
     mkRandomDataset(N, cpu_inp, cpu_flg);
     initOclControl();
 
-    testIncScan(N/512, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testIncScan(N/64, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testIncScan(N/8, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testIncScan(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testScanApps(N/512, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testScanApps(N/64, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testScanApps(N/8, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testScanApps(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     freeOclControl();
     free(cpu_inp);
