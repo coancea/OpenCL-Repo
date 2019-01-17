@@ -497,7 +497,7 @@ __kernel void scanPhaseSgmKer (
     }
 }
 
-/*************************/
+/*************************/ 
 /*** Partition Kernels ***/ 
 /*************************/
 __kernel void mapPredPartKer(  

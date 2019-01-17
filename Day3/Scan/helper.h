@@ -48,7 +48,7 @@ void initOclControl() {
     
     //opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
-    ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "scan.cl", compile_opts);
+    ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "scanapps.cl", compile_opts);
 }
 
 void initOclBuffers(const uint32_t N, uint8_t* cpu_flg, ElTp* cpu_inp) {
