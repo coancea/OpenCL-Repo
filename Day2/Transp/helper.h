@@ -143,14 +143,15 @@ void initProgramKernels() {
     }
 
     { // coalesced
-        const size_t local_size = CHUNK * TILE * TILE * sizeof(real);
         kers.optimProgrm = clCreateKernel(ctrl.prog, "optimProgrm", &error);
         OPENCL_SUCCEED(error);
         clSetKernelArg(kers.optimProgrm, 0, sizeof(cl_mem), &buffs.dA);
         clSetKernelArg(kers.optimProgrm, 1, sizeof(cl_mem), &buffs.dB);
         clSetKernelArg(kers.optimProgrm, 2, sizeof(cl_int), &buffs.height);
         clSetKernelArg(kers.optimProgrm, 3, sizeof(cl_int), &buffs.width);
-        clSetKernelArg(kers.optimProgrm, 4, local_size, NULL); // reserve space for local memory
+        // local memory allocated from inside the kernel
+        // const size_t local_size = CHUNK * TILE * TILE * sizeof(real);
+        // clSetKernelArg(kers.optimProgrm, 4, local_size, NULL); // reserve space for local memory
     }
 }
 

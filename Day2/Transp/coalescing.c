@@ -3,12 +3,12 @@
 #include "bridge.h"
 
 #define TILE   16
-#define CHUNK  16
+#define CHUNK  8   // CHUNK must divide TILE^2
 #define HEIGHT 67537
-#define WIDTH  96
+#define WIDTH  64
 
 #define RUNS_CPU 1
-#define RUNS_GPU 75
+#define RUNS_GPU 175
 
 #include "helper.h"
 /*******************************/
@@ -201,6 +201,7 @@ void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
             for (int32_t i = 0; i < RUNS_GPU; i++) {
                 ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kernel, 1, NULL,
                                                  &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+                OPENCL_SUCCEED(ciErr1);
             }
             clFinish(ctrl.queue);
         }
