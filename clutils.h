@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdint.h>
 
 //// Non-OpenCL utility functions.
 
