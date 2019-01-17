@@ -99,7 +99,7 @@ __kernel void naiveProgrm( __global real* A
 
     for(uint32_t j = 0; j < width; j++) {
         real tmpA = A[offset+j];
-        accum = sqrt(accum) + tmpA*tmpA;
+        accum = arithmFun(accum, tmpA);
         B[offset + j] = accum;
     }
 }
@@ -116,7 +116,7 @@ __kernel void coalsProgrm( __global real* A
 
     for(uint32_t j = 0; j < width; j++,gid+=height) {
         real tmpA = A[gid];
-        accum = sqrt(accum) + tmpA*tmpA;
+        accum = arithmFun(accum, tmpA);
         B[gid] = accum;
     }
 }
@@ -158,7 +158,7 @@ __kernel void optimProgrm0( __global real* A
         for(uint32_t k = 0; k < CHUNK; k++) {
             if( (j + k < width) && (gid < height)) {
                 real tmpA = lmem[lid][k]; //A[gid*width+j];
-                accum = sqrt(accum) + tmpA*tmpA;
+                accum = arithmFun(accum, tmpA);
                 //B[gid*width + j + k] = accum;
                 lmem[lid][k] = accum;
             }
@@ -228,7 +228,7 @@ __kernel void optimProgrm( __global real* A
         for(uint32_t k = 0; k < CWAVE; k++) {
             if( (j + k < width) && (gid < height)) {
                 real tmpA = dchunk[k]; //A[gid*width+j];
-                accum = sqrt(accum) + tmpA*tmpA;
+                accum = arithmFun(accum, tmpA);
                 //B[gid*width + j + k] = accum;
                 dchunk[k] = accum;
             }

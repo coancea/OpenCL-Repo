@@ -52,7 +52,7 @@ void goldProgrm(real* A, real* B, const uint32_t height, const uint32_t width) {
 
       for(uint32_t j = 0; j < width; j++) {
         real tmpA = A[offset+j];
-        accum = sqrt(accum) + tmpA*tmpA;
+        accum = arithmFun(accum, tmpA);
         B[offset + j] = accum;
       }
     } 
