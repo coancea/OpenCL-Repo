@@ -11,6 +11,7 @@ typedef struct OCLControl {
 typedef struct OCLKernels {
     cl_kernel memCpy; // Memcopy Kernel
 
+    /** scan and segmented scan kernels **/
     cl_kernel grpRed;      // reduction-phase kernel for straight scan
     cl_kernel grpSgmRed;   // reduction-phase kernel for segmented scan
 
@@ -20,8 +21,15 @@ typedef struct OCLKernels {
     cl_kernel grpScan;     // inclusive-scan kernel
     cl_kernel grpSgmScan;  // segmented-scan kernel (also inclusive)
 
+    /** partition2 kernels **/
     cl_kernel mapPredPart;     // partition2 kernel
     cl_kernel scatterPart;     // partition2 kernel
+
+    /** sparse-matrix-vector multiplication kernels **/
+    cl_kernel iniFlagsSpMVM;
+    cl_kernel mkFlagsSpMVM;
+    cl_kernel mulPhaseSpMVM;
+    cl_kernel getLastSpMVM;
 } OclKernels;
 
 typedef struct OCLBuffers {
@@ -65,7 +73,7 @@ void initOclBuffers(const uint32_t N, uint8_t* cpu_flg, ElTp* cpu_inp) {
 
     // global-memory flags buffer
     size = N*sizeof(uint8_t);
-    buffs.flg = clCreateBuffer(ctrl.ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, cpu_flg, &error);
+    buffs.flg = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, size, cpu_flg, &error);
     OPENCL_SUCCEED(error);
 
     // global-memory scan result
@@ -112,6 +120,18 @@ void initKernels() {
 
     kers.scatterPart= clCreateKernel(ctrl.prog, "scatterPartKer", &error);
     OPENCL_SUCCEED(error);
+
+    kers.iniFlagsSpMVM= clCreateKernel(ctrl.prog, "iniFlagsSpMVM", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.mkFlagsSpMVM= clCreateKernel(ctrl.prog, "mkFlagsSpMVM", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.mulPhaseSpMVM= clCreateKernel(ctrl.prog, "mulPhaseSpMVM", &error);
+    OPENCL_SUCCEED(error);
+
+    kers.getLastSpMVM= clCreateKernel(ctrl.prog, "getLastSpMVM", &error);
+    OPENCL_SUCCEED(error);
 }
 
 void gpuToCpuTransfer(const uint32_t N, cl_mem gpu_out, ElTp* cpu_out) {
@@ -131,6 +151,13 @@ void freeOclBuffKers() {
     clReleaseKernel(kers.grpSgmRed);
     clReleaseKernel(kers.shortSgmScan);
     clReleaseKernel(kers.grpSgmScan);
+
+    clReleaseKernel(kers.mapPredPart);
+    clReleaseKernel(kers.scatterPart);
+    clReleaseKernel(kers.iniFlagsSpMVM);
+    clReleaseKernel(kers.mkFlagsSpMVM);
+    clReleaseKernel(kers.mulPhaseSpMVM);
+    clReleaseKernel(kers.getLastSpMVM);
 
     //fprintf(stderr, "Releasing GPU buffers ...\n");
     clReleaseMemObject(buffs.inp);

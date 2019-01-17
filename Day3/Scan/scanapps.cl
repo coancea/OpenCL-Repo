@@ -525,6 +525,13 @@ __kernel void scatterPartKer(
     if(gid < N) {
         ElTp el = inp[gid];
         uint32_t v = pred(el);
+        uint32_t  ind = 0;
+        __global uint32_t* ptr = NULL;
+        uint32_t i = isT[N-1];
+        if(v == 1) { ptr = isT; } else { ptr = isF; ind = i; }
+        ind += ptr[gid];
+        out[ind-1] = el;
+#if 0
         if (v == 1) { // likely expensive due to divergence
             uint32_t tind = isT[gid];
             out[tind-1] = el;
@@ -533,5 +540,60 @@ __kernel void scatterPartKer(
             uint32_t find = isF[gid] + i;
             out[find-1] = el;
         }
+#endif
     } 
+}
+
+/***************************/ 
+/*** SpMatVecMul Kernels ***/ 
+/***************************/
+
+__kernel void iniFlagsSpMVM(  
+        uint32_t            N,
+        __global uint8_t*   out
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < N) {
+        out[gid] = 0;
+    }
+}
+
+__kernel void mkFlagsSpMVM(  
+        uint32_t            num_rows,
+        __global uint32_t*  shape_scn,
+        __global uint8_t*   flags
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < num_rows) {
+        uint32_t ind = 0;
+        if (gid > 0) ind = shape_scn[gid-1];
+        flags[ind] = 1;
+    }
+}
+
+__kernel void mulPhaseSpMVM(  
+        uint32_t            N,
+        __global uint32_t*  mat_ind,
+        __global ElTp*      mat_val,
+        __global ElTp*      vect,
+        __global ElTp*      out
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < N) {
+        uint32_t ind   = mat_ind[gid];
+        ElTp     val   = mat_val[gid];
+        out[gid] = val * vect[ind];
+    }
+}
+
+__kernel void getLastSpMVM(  
+        uint32_t            num_rows,
+        __global uint32_t*  shape_scn,
+        __global ElTp*      sgm_mat,
+        __global ElTp*      out
+) {
+    uint32_t gid = get_global_id(0);
+    if(gid < num_rows) {
+        out[gid] = sgm_mat[ shape_scn[gid]-1 ];
+    }
 }

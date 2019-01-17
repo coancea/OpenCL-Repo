@@ -3,13 +3,14 @@
 
 #define NUM_GROUPS_SCAN     1024
 #define WORKGROUP_SIZE      256
-#define RUNS_GPU            300
+#define RUNS_GPU            200
 #define ELEMS_PER_THREAD    7
 
 #include "bridge.h"
 #include "helper.h"
 #include "scan.h"
 #include "partition2.h"
+#include "spMatVecMult.h"
 
 void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_ref, ElTp *cpu_out) {
     // init buffers and kernels arguments
@@ -34,8 +35,8 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     // compute sequential (golden) segmented scan version 
     goldenScan(1, N, cpu_inp, cpu_flg, cpu_ref);
 
+    SgmScanBuffs arrs;
     { // segmented inclusive scan on GPU
-        SgmScanBuffs arrs;
         arrs.N   = N;
         arrs.inp = buffs.inp;
         arrs.flg = buffs.flg;
@@ -72,6 +73,9 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
         clReleaseMemObject(arrs.isT);
         clReleaseMemObject(arrs.isF);
     }
+
+    // finally sparse-matrix vector multiplication
+    profileSpMatVectMul(arrs, cpu_inp);
     printf("\n");
 
     // Release GPU Buffer/Kernels resources!!!
