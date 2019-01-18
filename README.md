@@ -10,6 +10,7 @@ Various code examples in OpenCL
 * 2D stencil, with texture memory
 * Profiling and debugging
 * Naive matrix-matrix multiplication
+* Reduction
 
 ### Exercise ideas
 
