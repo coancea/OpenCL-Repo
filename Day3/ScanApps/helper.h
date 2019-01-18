@@ -41,8 +41,8 @@ typedef struct OCLBuffers {
     cl_mem  flg; // length `N` bytes
     cl_mem  out; // length `N` elements
 
-    cl_mem  tmp_val; // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` elements
-    cl_mem  tmp_flg; // holds `WORKGROUP_SIZE*ELEMS_PER_THREAD` bytes
+    cl_mem  tmp_val; // holds `NUM_GROUPS_SCAN` elements
+    cl_mem  tmp_flg; // holds `NUM_GROUPS_SCAN` bytes
 } OclBuffers;
 
 //CpuArrays  arrs;

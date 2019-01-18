@@ -4,7 +4,7 @@
 typedef struct IncScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements 
-    cl_mem        tmp;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` elements
+    cl_mem        tmp;  // holds `NUM_GROUPS_SCAN` elements
     cl_mem        out;  // result array holding `N` elements
 } IncScanBuffs;
 
@@ -12,8 +12,8 @@ typedef struct SgmScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements
     cl_mem        flg;  // input flags holding `N` bytes
-    cl_mem        tmp_val;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` elements
-    cl_mem        tmp_flg;  // holds `NUM_GROUPS_SCAN*ELEMS_PER_THREAD` bytes
+    cl_mem        tmp_val;  // holds `NUM_GROUPS_SCAN` elements
+    cl_mem        tmp_flg;  // holds `NUM_GROUPS_SCAN` bytes
     cl_mem        out;  // result array holding `N` elements
 } SgmScanBuffs;
 
