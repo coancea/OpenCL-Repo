@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 
 //// Non-OpenCL utility functions.
 
@@ -258,7 +259,10 @@ static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
                                        const char *file, const char *options_fmt, ...) {
   cl_int error;
   const char *kernel_src = slurp_file(file);
-  assert(kernel_src != NULL);
+  if (kernel_src == NULL) {
+    fprintf(stderr, "Cannot open %s: %s\n", file, strerror(errno));
+    abort();
+  }
   size_t src_len = strlen(kernel_src);
 
   cl_program program = clCreateProgramWithSource(ctx, 1, &kernel_src, &src_len, &error);
