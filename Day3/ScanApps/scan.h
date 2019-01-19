@@ -18,8 +18,8 @@ typedef struct SgmScanBUFFS {
 } SgmScanBuffs;
 
 uint32_t getScanNumGroups(const uint32_t N) {
-    uint32_t min_elem_per_group = WORKGROUP_SIZE * ELEMS_PER_THREAD;
-    uint32_t num1 = (N + min_elem_per_group - 1) / min_elem_per_group;
+    const uint32_t min_elem_per_group = WORKGROUP_SIZE * ELEMS_PER_THREAD;
+    const uint32_t num1 = (N + min_elem_per_group - 1) / min_elem_per_group;
     return (num1 < NUM_GROUPS_SCAN) ? num1 : NUM_GROUPS_SCAN;
 }
 
@@ -30,9 +30,9 @@ uint32_t getScanNumGroups(const uint32_t N) {
 cl_int runScan(IncScanBuffs arrs) {
     cl_int error = CL_SUCCESS;
     const uint32_t num_groups      = getScanNumGroups(arrs.N);
-    const uint32_t elems_per_group = (arrs.N + num_groups - 1) / num_groups;
-
-    //printf("Number of groups: %d, Number elements per group: %d\n\n", num_groups, elems_per_group);
+    const uint32_t elems_per_group0= (arrs.N + num_groups - 1) / num_groups;
+    const uint32_t min_elem_per_group = WORKGROUP_SIZE * ELEMS_PER_THREAD;
+    const uint32_t elems_per_group = ((elems_per_group0 + min_elem_per_group - 1) / min_elem_per_group) * min_elem_per_group;
 
     const size_t   local_length   = WORKGROUP_SIZE * ELEMS_PER_THREAD;
     const size_t   localWorkSize  = WORKGROUP_SIZE;
@@ -114,7 +114,9 @@ void profileScan(IncScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
 cl_int runSgmScan(SgmScanBuffs arrs) {
     cl_int error = CL_SUCCESS;
     const uint32_t num_groups      = getScanNumGroups(arrs.N);
-    const uint32_t elems_per_group = (arrs.N + num_groups - 1) / num_groups;
+    const uint32_t elems_per_group0= (arrs.N + num_groups - 1) / num_groups;
+    const uint32_t min_elem_per_group = WORKGROUP_SIZE * ELEMS_PER_THREAD;
+    const uint32_t elems_per_group = ((elems_per_group0 + min_elem_per_group - 1) / min_elem_per_group) * min_elem_per_group;
 
     //printf("Number of groups: %d, Number elements per group: %d\n\n", num_groups, elems_per_group);
 

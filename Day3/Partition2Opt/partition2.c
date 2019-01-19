@@ -2,7 +2,8 @@
 #include <math.h>
 
 #define NUM_GROUPS_SCAN     1024
-#define WORKGROUP_SIZE      (256+32)
+#define WORKGROUP_SIZE      256
+#define ELEMS_PER_THREAD    7
 #define RUNS_GPU            300
 
 #include "bridge.h"

@@ -36,7 +36,7 @@ PartitionBuffs buffs;
 
 void initOclControl() {
     char    compile_opts[128];
-    sprintf(compile_opts, "-D lgWARP=%d", lgWARP);
+    sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d", lgWARP, ELEMS_PER_THREAD);
     
     //opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
@@ -144,16 +144,21 @@ void validate(ElTp* A, ElTp* B, uint32_t sizeAB){
 /************************/
 
 uint32_t getScanNumGroups(const uint32_t N) {
-    uint32_t min_elem_per_group = WORKGROUP_SIZE;
+    uint32_t min_elem_per_group = WORKGROUP_SIZE*ELEMS_PER_THREAD;
     uint32_t num1 = (N + min_elem_per_group - 1) / min_elem_per_group;
     return (num1 < NUM_GROUPS_SCAN) ? num1 : NUM_GROUPS_SCAN;
+}
+
+inline size_t max_int(size_t a, size_t b) {
+    return (a < b) ? b : a;
 }
 
 cl_int runPartition(PartitionBuffs arrs) {
     cl_int error = CL_SUCCESS;
     const uint32_t num_groups      = getScanNumGroups(arrs.N);
     const uint32_t elems_per_group0= (arrs.N + num_groups - 1) / num_groups;
-    const uint32_t elems_per_group = ((elems_per_group0 + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE) * WORKGROUP_SIZE;
+    uint32_t min_elem_per_group = WORKGROUP_SIZE*ELEMS_PER_THREAD;
+    const uint32_t elems_per_group = ((elems_per_group0 + min_elem_per_group - 1) / min_elem_per_group) * min_elem_per_group;
     //printf("N: %d, num_groups: %d, elems-per-group:%d\n", arrs.N, num_groups, elems_per_group);
     
     const size_t   localWorkSize  = WORKGROUP_SIZE;
@@ -170,6 +175,7 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpRed, 1, NULL,
                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        OPENCL_SUCCEED(error);
     }
 
     {   // run scan on the group resulted from the group-reduction kernel
@@ -182,10 +188,12 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.shortScan, 1, NULL,
                                         &localWorkSize, &localWorkSize, 0, NULL, NULL);
+        OPENCL_SUCCEED(error);
     }
 
     {   // run intra-block scan kernel while accumulating from the result of the previous step
-        const size_t local_size = WORKGROUP_SIZE * (2*sizeof(int32_t) + sizeof(ElTp));
+        //const size_t local_size = WORKGROUP_SIZE * max_int(2*sizeof(int32_t) + sizeof(ElTp), ELEMS_PER_THREAD*sizeof(ElTp));
+        const size_t local_size = WORKGROUP_SIZE * ELEMS_PER_THREAD * sizeof(ElTp);
         error |= clSetKernelArg(kers.grpScan, 0, sizeof(uint32_t), (void *)&arrs.N);
         error |= clSetKernelArg(kers.grpScan, 1, sizeof(uint32_t), (void *)&elems_per_group);
         error |= clSetKernelArg(kers.grpScan, 2, sizeof(cl_mem), (void*)&arrs.inp);
@@ -196,6 +204,7 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpScan, 1, NULL,
                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+        OPENCL_SUCCEED(error);
     }
     return error;
 }

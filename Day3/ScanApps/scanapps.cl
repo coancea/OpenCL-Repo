@@ -89,7 +89,7 @@ __kernel void redPhaseKer (
             uint32_t lind = i*get_local_size(0) + tid;
             uint32_t gind = group_offset + k + lind;
             ElTp v;
-            if ( (gind < N) && (lind+k < elem_per_group) ) { v = d_inp[gind]; } else { v = NE; }
+            if (gind < N) { v = d_inp[gind]; } else { v = NE; }
             locmem[lind] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -169,7 +169,7 @@ __kernel void scanPhaseKer (
             uint32_t lind = i*get_local_size(0) + tid;
             uint32_t gind = group_offset + k + lind;
             ElTp v;
-            if ( (gind < N) && (lind+k < elem_per_group) ) { v = d_inp[gind]; } else { v = NE; }
+            if (gind < N) { v = d_inp[gind]; } else { v = NE; }
             locmem[lind] = v;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -206,7 +206,7 @@ __kernel void scanPhaseKer (
         for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
             uint32_t lind = i*get_local_size(0) + tid;
             uint32_t gind = group_offset + k + lind;
-            if( (gind < N) && (lind+k < elem_per_group) ) {
+            if (gind < N) {
                 d_out[gind] = locmem[lind];
             }
         }
@@ -292,7 +292,7 @@ __kernel void redPhaseSgmKer (
                 uint32_t lind = i*get_local_size(0) + tid;
                 uint32_t gind = group_offset + k + lind;
                 ElTp v;
-                if ( (gind < N) && (lind+k < elem_per_group) ) { v = d_inp[gind]; } else { v = NE; }
+                if (gind < N) { v = d_inp[gind]; } else { v = NE; }
                 locmem[lind] = v;
             }
             barrier(CLK_LOCAL_MEM_FENCE);
@@ -312,7 +312,7 @@ __kernel void redPhaseSgmKer (
                 uint32_t lind = i*get_local_size(0) + tid;
                 uint32_t gind = group_offset + k + lind;
                 uint8_t  v;
-                if ( (gind < N) && (lind+k < elem_per_group) ) { v = d_flg[gind]; } else { v = 0; }
+                if (gind < N) { v = d_flg[gind]; } else { v = 0; }
                 locmem_flg[lind] = v;
             }
             barrier(CLK_LOCAL_MEM_FENCE);
@@ -334,7 +334,7 @@ __kernel void redPhaseSgmKer (
                 acc = binOpFlg(acc, chunk[i]);
             }
 
-            // 4. publish in local memory and perform intra-group scan 
+            // 4. publish in local memory and perform intra-group scan
             locmem[tid]     = acc.val;
             locmem_flg[tid] = acc.flg;
             barrier(CLK_LOCAL_MEM_FENCE);
@@ -444,8 +444,6 @@ __kernel void scanPhaseSgmKer (
             barrier(CLK_LOCAL_MEM_FENCE);
         }
 
-
-        
         {   // 3. sequentially scan from register memory ELEMS_PER_THREAD elements
             FlgTuple tmp = chunk[0];
             #pragma unroll

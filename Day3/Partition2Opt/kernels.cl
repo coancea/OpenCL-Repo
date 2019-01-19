@@ -11,30 +11,6 @@ inline int2 binOp(const int2 a, const int2 b) {
     return res;
 }
 
-__kernel void memcpy_wflags ( 
-        uint32_t            N,
-        __global uint8_t*   d_flg,      // read-only,  [N]
-        __global ElTp*      d_inp,      // read-only,  [N]
-        __global ElTp*      d_out       // write-only, [N]
-) {
-    uint32_t gid = get_global_id(0);
-    if(gid < N) {
-        d_out[gid] = d_inp[gid] + d_flg[gid];
-    }
-}
-
-__kernel void memcpy_simple (
-        uint32_t            N,
-        __global ElTp*      d_inp,      // read-only,  [N]
-        __global ElTp*      d_out       // write-only, [N]
-) {
-    uint32_t gid = get_global_id(0);
-    if(gid < N) {
-        d_out[gid] = d_inp[gid];
-    }
-}
-
-
 /*****************************************/
 /*** Inclusive Scan Helpers and Kernel ***/ 
 /*****************************************/
@@ -108,14 +84,13 @@ __kernel void redPhaseKer (
     int2 acc = 0;
 
     for(uint32_t k = 0; k < elem_per_group; k += get_local_size(0)) {
-        int2 tf = 0;
         uint32_t gid = group_offset + k + tid;
         if ( gid < N ) { 
             ElTp elm = d_inp[gid];
-            tf.x = pred(elm);
-            tf.y = 1 - tf.x;
+            int32_t c = pred(elm);
+            acc.x += c;
+            acc.y += (1 - c);
         }
-        acc = binOp(acc, tf);
     }
 
     { // scan in local memory
@@ -166,6 +141,122 @@ __kernel void shortScanKer(
         acc = binOp(acc, cur);
     }
 }
+
+#if 1
+__kernel void scanPhaseKer ( 
+        uint32_t            N,
+        uint32_t            elem_per_group,
+        __global ElTp*      d_inp,      // read-only,   [N]
+        __global int32_t* d_accT,     // read-only,   [number of workgroups]
+        __global int32_t* d_accF,     // read-only,   [number of workgroups]
+        __global ElTp*      d_out,      // write-only,  [N]
+        volatile __local int32_t* locmem  // local memory [group-size * ELEMS_PER_THREAD];
+) {
+    volatile __local ElTp* locmem_e = (volatile __local ElTp*)locmem;
+    volatile __local int32_t* locmem_x = locmem;
+    volatile __local int32_t* locmem_y = locmem_x + get_local_size(0);
+    const uint32_t tid = get_local_id(0);
+    const uint32_t group_offset = get_group_id(0) * elem_per_group;
+    const uint32_t group_chunk  = ELEMS_PER_THREAD * get_local_size(0);
+    int2  accum = 0;
+    uint32_t gii;
+
+    if(tid == 0) {
+        if( get_group_id(0) > 0) {
+            accum.x = d_accT[get_group_id(0)-1];
+            accum.y = d_accF[get_group_id(0)-1];
+        }
+        locmem_x[0] = accum.x; locmem_x[1] = accum.y; locmem_x[2] = d_accT[get_num_groups(0)-1];
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    accum.x = locmem_x[0]; accum.y = locmem_x[1]; gii = locmem_x[2];
+
+    for(uint32_t k = 0; k < elem_per_group; k += group_chunk) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 1. read ELEMS_PER_THREAD elements from global to local memory
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint32_t lind = i*get_local_size(0) + tid;
+            uint32_t gind = group_offset + k + lind;
+            ElTp v;
+            if (gind < N) { v = d_inp[gind]; } else { v = NE; }
+            locmem_e[lind] = v;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        ElTp  chunk[ELEMS_PER_THREAD];
+        uint32_t lind = tid*ELEMS_PER_THREAD; 
+        uint32_t gind0 = lind + group_offset + k;
+        int2 tf; tf.x = 0; tf.y = 0;        
+ 
+        // 2. store in register memory and sequentially reduce
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            if(gind0 + i < N) {
+                int32_t c;
+                ElTp el = locmem_e[lind + i];
+                chunk[i] = el;
+                c = pred(el);
+                tf.x += c;
+                tf.y += (1 - c);
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 3. publish in local memory and perform intra-group scan 
+        locmem_x[tid] = tf.x;
+        locmem_y[tid] = tf.y;
+        barrier(CLK_LOCAL_MEM_FENCE);
+        incScanGroup(locmem_x, locmem_y, tid);
+        
+        // 4. read the previous element and complete the scan in local memory
+        int32_t num_ts = locmem_x[get_local_size(0)-1];
+        int32_t num_fs = locmem_y[get_local_size(0)-1];
+
+        tf.x = 0; tf.y = 0;
+        if (tid > 0) { tf.x = locmem_x[tid-1]; tf.y = locmem_y[tid-1]; }
+
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            if(gind0 + i < N) {
+                int32_t c = pred(chunk[i]);
+                int32_t lmem_index = lind + i;
+                if (c==1) { 
+                    lmem_index = tf.x;
+                    tf.x++;
+                } else { 
+                    lmem_index = tf.y + num_ts;
+                    tf.y++;
+                }
+                locmem_e[lmem_index % (ELEMS_PER_THREAD*get_local_size(0))] = chunk[i]; // STRANGE BUG 1 !!!
+                //locmem_e[lmem_index] = chunk[i];
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint32_t lind = i*get_local_size(0) + tid;
+            uint32_t gind = group_offset + k + lind;
+            if (gind < N) {
+                // d_out[gind] = locmem[lind];
+                uint32_t gmem_index;
+                if (lind < num_ts) {
+                    gmem_index = lind + accum.x;
+                } else {
+                    gmem_index = lind - num_ts + accum.y + gii;
+                }
+                d_out[gmem_index] = locmem_e[lind];
+            }
+        }
+
+        // update accum for the next iteration
+        accum.x += num_ts; accum.y += num_fs;
+    }
+}
+
+#else
 
 __kernel void scanPhaseKer ( 
         uint32_t            N,
@@ -224,12 +315,11 @@ __kernel void scanPhaseKer (
             }
         }
         // finally, write to global memory
-#if 0
         if( gid < N ) {
             d_out[gmem_index] = elm;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-#else
+#if 0
         // write in new order the element and its destination index to local memory
         if( gid < N ) {
             locmem_e[lmem_index] = elm;
@@ -249,4 +339,5 @@ __kernel void scanPhaseKer (
         accum.x += last.x; accum.y += last.y;
     }
 }
+#endif
 

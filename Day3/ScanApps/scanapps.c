@@ -45,7 +45,7 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
         arrs.tmp_flg = buffs.tmp_flg;
         profileSgmScan(arrs, cpu_ref, cpu_out);
     }
-    
+
     goldenPartition(N, cpu_inp, cpu_ref);
 
     { // partition2
@@ -76,6 +76,7 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
 
     // finally sparse-matrix vector multiplication
     profileSpMatVectMul(arrs, cpu_inp);
+
     printf("\n");
 
     // Release GPU Buffer/Kernels resources!!!
