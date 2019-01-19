@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="day1\fibfact.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day1\matmul-naive.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day1\rot13-profile-simple.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day1\rot13.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day2\mmmult\mmm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day2\transp\coalescing.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="day3\scan\scanapps.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="examples\scan\Scan.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="clutils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day2\mmmult\bridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day2\mmmult\mmm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day2\transp\bridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day2\transp\helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day3\scan\bridge.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day3\scan\helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day3\scan\partition2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day3\scan\scan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="day3\scan\spMatVecMult.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="examples\scan\GenericHack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="examples\scan\SetupOpenCL.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="examples\utils\SDK_stub.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="examples\utils\Util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

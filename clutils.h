@@ -31,13 +31,14 @@
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 
 //// Non-OpenCL utility functions.
 
 // Read a file into a NUL-terminated string; returns NULL on error.
 char* slurp_file(const char *filename) {
   char *s;
-  FILE *f = fopen(filename, "r");
+  FILE *f = fopen(filename, "rb"); // To avoid Windows messing with linebreaks.
   if (f == NULL) return NULL;
   fseek(f, 0, SEEK_END);
   size_t src_size = ftell(f);
@@ -46,8 +47,9 @@ char* slurp_file(const char *filename) {
   if (fread(s, 1, src_size, f) != src_size) {
     free(s);
     s = NULL;
+  } else {
+    s[src_size] = '\0';
   }
-  s[src_size] = '\0';
   fclose(f);
 
   return s;
@@ -258,7 +260,10 @@ static cl_program opencl_build_program(cl_context ctx, cl_device_id device,
                                        const char *file, const char *options_fmt, ...) {
   cl_int error;
   const char *kernel_src = slurp_file(file);
-  assert(kernel_src != NULL);
+  if (kernel_src == NULL) {
+    fprintf(stderr, "Cannot open %s: %s\n", file, strerror(errno));
+    abort();
+  }
   size_t src_len = strlen(kernel_src);
 
   cl_program program = clCreateProgramWithSource(ctx, 1, &kernel_src, &src_len, &error);
