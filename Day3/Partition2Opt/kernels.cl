@@ -147,8 +147,8 @@ __kernel void scanPhaseKer (
         uint32_t            N,
         uint32_t            elem_per_group,
         __global ElTp*      d_inp,      // read-only,   [N]
-        __global int32_t* d_accT,     // read-only,   [number of workgroups]
-        __global int32_t* d_accF,     // read-only,   [number of workgroups]
+        __global int32_t*   d_accT,     // read-only,   [number of workgroups]
+        __global int32_t*   d_accF,     // read-only,   [number of workgroups]
         __global ElTp*      d_out,      // write-only,  [N]
         volatile __local int32_t* locmem  // local memory [group-size * ELEMS_PER_THREAD];
 ) {
@@ -188,7 +188,7 @@ __kernel void scanPhaseKer (
         ElTp  chunk[ELEMS_PER_THREAD];
         uint32_t lind = tid*ELEMS_PER_THREAD; 
         uint32_t gind0 = lind + group_offset + k;
-        int2 tf; tf.x = 0; tf.y = 0;        
+        int2 tf = 0;     
  
         // 2. store in register memory and sequentially reduce
         #pragma unroll
@@ -214,14 +214,15 @@ __kernel void scanPhaseKer (
         int32_t num_ts = locmem_x[get_local_size(0)-1];
         int32_t num_fs = locmem_y[get_local_size(0)-1];
 
-        tf.x = 0; tf.y = 0;
+        tf = 0;
         if (tid > 0) { tf.x = locmem_x[tid-1]; tf.y = locmem_y[tid-1]; }
+        barrier(CLK_LOCAL_MEM_FENCE);
 
         #pragma unroll
         for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
             if(gind0 + i < N) {
                 int32_t c = pred(chunk[i]);
-                int32_t lmem_index = lind + i;
+                int32_t lmem_index;
                 if (c==1) { 
                     lmem_index = tf.x;
                     tf.x++;
@@ -229,8 +230,8 @@ __kernel void scanPhaseKer (
                     lmem_index = tf.y + num_ts;
                     tf.y++;
                 }
-                locmem_e[lmem_index % (ELEMS_PER_THREAD*get_local_size(0))] = chunk[i]; // STRANGE BUG 1 !!!
-                //locmem_e[lmem_index] = chunk[i];
+                locmem_e[lmem_index] = chunk[i];
+                //locmem_e[lind+i] = chunk[i];
             }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -240,7 +241,6 @@ __kernel void scanPhaseKer (
             uint32_t lind = i*get_local_size(0) + tid;
             uint32_t gind = group_offset + k + lind;
             if (gind < N) {
-                // d_out[gind] = locmem[lind];
                 uint32_t gmem_index;
                 if (lind < num_ts) {
                     gmem_index = lind + accum.x;
