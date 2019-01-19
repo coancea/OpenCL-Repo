@@ -47,8 +47,9 @@ char* slurp_file(const char *filename) {
   if (fread(s, 1, src_size, f) != src_size) {
     free(s);
     s = NULL;
+  } else {
+    s[src_size] = '\0';
   }
-  s[src_size] = '\0';
   fclose(f);
 
   return s;
