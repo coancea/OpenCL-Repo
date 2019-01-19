@@ -3,7 +3,7 @@
 
 #define NUM_GROUPS_SCAN     1024
 #define WORKGROUP_SIZE      256
-#define ELEMS_PER_THREAD    7
+#define ELEMS_PER_THREAD    9
 #define RUNS_GPU            300
 
 #include "bridge.h"
@@ -47,6 +47,3 @@ int main() {
     free(cpu_ref);
     free(cpu_out);
 }
-
-// /usr/lib/x86_64-linux-gnu/libOpenCL.so
-// For Apple: g++ -O2 Scan.cpp -framework OpenCL

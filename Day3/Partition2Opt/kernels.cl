@@ -319,22 +319,7 @@ __kernel void scanPhaseKer (
             d_out[gmem_index] = elm;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-#if 0
-        // write in new order the element and its destination index to local memory
-        if( gid < N ) {
-            locmem_e[lmem_index] = elm;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        if ( gid < N ) {
-            int32_t gmem_index;
-            if (tid < last.x) { 
-                gmem_index = (tid+accum.x); 
-            } else {
-                gmem_index = tid - last.x + accum.y + gii;
-            }
-            d_out[gmem_index] = locmem_e[tid];
-        }
-#endif
+
         // update accum for the next iteration
         accum.x += last.x; accum.y += last.y;
     }

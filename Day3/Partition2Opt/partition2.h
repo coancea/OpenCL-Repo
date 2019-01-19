@@ -6,10 +6,10 @@
 /***********************/
 
 typedef struct OCLControl {
-    cl_context          ctx;            // OpenCL context
-    cl_device_id        device;      // OpenCL device list
-    cl_program          prog;      // OpenCL program
-    cl_command_queue    queue; // command queue of the targe GPU device
+    cl_context          ctx;    // OpenCL context
+    cl_device_id        device; // OpenCL device list
+    cl_program          prog;   // OpenCL program
+    cl_command_queue    queue;  // command queue of the targe GPU device
 } OclControl;
 
 typedef struct OCLKernels {
@@ -21,8 +21,8 @@ typedef struct OCLKernels {
 typedef struct PartitionBUFFS {
     uint32_t      N;
     cl_mem        inp;  // [N]ElTp 
-    cl_mem        tmpT; // [2*NUM_GROUPS_SCAN]int32_t
-    cl_mem        tmpF; // [2*NUM_GROUPS_SCAN]int32_t
+    cl_mem        tmpT; // [NUM_GROUPS_SCAN]int32_t
+    cl_mem        tmpF; // [NUM_GROUPS_SCAN]int32_t
     cl_mem        out;  // [N]ElTp
 } PartitionBuffs;
 
@@ -192,7 +192,6 @@ cl_int runPartition(PartitionBuffs arrs) {
     }
 
     {   // run intra-block scan kernel while accumulating from the result of the previous step
-        //const size_t local_size = WORKGROUP_SIZE * max_int(2*sizeof(int32_t) + sizeof(ElTp), ELEMS_PER_THREAD*sizeof(ElTp));
         const size_t local_size = WORKGROUP_SIZE * ELEMS_PER_THREAD * sizeof(ElTp);
         error |= clSetKernelArg(kers.grpScan, 0, sizeof(uint32_t), (void *)&arrs.N);
         error |= clSetKernelArg(kers.grpScan, 1, sizeof(uint32_t), (void *)&elems_per_group);
