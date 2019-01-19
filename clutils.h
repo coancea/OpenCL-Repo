@@ -37,7 +37,7 @@
 // Read a file into a NUL-terminated string; returns NULL on error.
 char* slurp_file(const char *filename) {
   char *s;
-  FILE *f = fopen(filename, "r");
+  FILE *f = fopen(filename, "rb"); // To avoid Windows messing with linebreaks.
   if (f == NULL) return NULL;
   fseek(f, 0, SEEK_END);
   size_t src_size = ftell(f);
