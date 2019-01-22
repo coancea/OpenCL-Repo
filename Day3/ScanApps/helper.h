@@ -52,7 +52,8 @@ OclBuffers buffs;
 
 void initOclControl() {
     char    compile_opts[128];
-    sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d", lgWARP, ELEMS_PER_THREAD);
+    sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d -D NE=%d -D ElTp=%s",
+            lgWARP, ELEMS_PER_THREAD, NE, ElTp_STR);
     
     //opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);

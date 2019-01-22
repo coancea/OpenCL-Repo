@@ -1,6 +1,10 @@
 #ifndef SCAN_H
 #define SCAN_H
 
+/**********************/
+/*** Data Structures***/
+/**********************/
+
 typedef struct IncScanBUFFS {
     uint32_t      N;
     cl_mem        inp;  // input array holding `N` elements 

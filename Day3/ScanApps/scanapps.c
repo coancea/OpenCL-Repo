@@ -1,12 +1,28 @@
 #include "../../clutils.h"
 #include <math.h>
 
+typedef int32_t     ElTp;
+#define ElTp_STR    "int32_t"
+#define NE          0
+#define lgWARP      5
+#define WARP        (1<<lgWARP)
+
 #define NUM_GROUPS_SCAN     1024
 #define WORKGROUP_SIZE      256
 #define RUNS_GPU            200
 #define ELEMS_PER_THREAD    7
 
-#include "bridge.h"
+/**
+ * CODE CLONEs!!! 
+ * Please change consistently in scanapps.cl as well
+ */
+inline ElTp binOp(ElTp v1, ElTp v2) {
+    return (v1 + v2);
+}
+inline uint32_t pred(int32_t k) {
+    return (1 - (k & 1));
+}
+
 #include "helper.h"
 #include "scan.h"
 #include "partition2.h"

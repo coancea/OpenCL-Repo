@@ -1,12 +1,23 @@
 #include "../../clutils.h"
 #include <math.h>
 
+typedef int32_t     ElTp;
+#define ElTp_STR    "int32_t"
+#define NE          0
+
+inline uint32_t pred(int32_t k) {
+    return (1 - (k & 1));
+}
+
+#define lgWARP              5
+#define WARP                (1<<lgWARP)
+
 #define NUM_GROUPS_SCAN     1024
 #define WORKGROUP_SIZE      256
 #define ELEMS_PER_THREAD    9
 #define RUNS_GPU            300
 
-#include "bridge.h"
+
 #include "partition2.h"
 
 void testOptPartition(const uint32_t N, ElTp *cpu_inp, ElTp *cpu_ref, ElTp *cpu_out) {

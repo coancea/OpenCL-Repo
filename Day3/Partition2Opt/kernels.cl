@@ -2,7 +2,11 @@ typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
 
-#include "bridge.h" 
+#define WARP    (1<<lgWARP)
+
+inline uint32_t pred(int32_t k) {
+    return (1 - (k & 1));
+}
 
 inline int2 binOp(const int2 a, const int2 b) {
     int2 res;
