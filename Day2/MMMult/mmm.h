@@ -31,9 +31,11 @@ OclKernels kers;
 OclBuffers buffs;
 
 void initOclControl() {
+    char    compile_opts[128]; 
+    sprintf(compile_opts, "-D TILE=%d -D RT=%d -D real=%s", TILE, RT, REAL_STR);
     //opencl_init_command_queue(0, DEVICE_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
-    ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "mmm.cl", "");
+    ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "mmm.cl", compile_opts);
 }
 
 void initOclBuffers ( const uint32_t heightA

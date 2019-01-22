@@ -1,4 +1,4 @@
 PROGRAMS=coalescing
-INCLUDES=helper.h bridge.h ../../clutils.h
+INCLUDES=helper.h ../../clutils.h
 
 include ../../common.mk

@@ -1,11 +1,13 @@
 #ifndef TRANSP_KERNELS
 #define TRANSP_KERNELS
 
-#include "bridge.h"
-
 typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
+
+real arithmFun(real accum, real a) {
+    return (a*a - accum);  // sqrt(accum) + a*a;
+}
 
 __kernel void memcpy_simple ( 
         uint32_t            N,

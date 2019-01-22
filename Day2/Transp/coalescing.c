@@ -1,6 +1,8 @@
 #include "../../clutils.h"
 #include <math.h>
-#include "bridge.h"
+
+typedef float real;
+#define REAL_STR "float"
 
 #define TILE   16
 #define CHUNK  8   // CHUNK must divide TILE^2

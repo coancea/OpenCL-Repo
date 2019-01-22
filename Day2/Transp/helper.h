@@ -49,7 +49,7 @@ OclBuffers buffs;
 
 void initOclControl() {
     char    compile_opts[128];
-    sprintf(compile_opts, "-D TILE=%d -D CHUNK=%d", TILE, CHUNK);
+    sprintf(compile_opts, "-D TILE=%d -D CHUNK=%d -D real=%s", TILE, CHUNK, REAL_STR);
     //opencl_init_command_queue(0, DEVICE_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
     ctrl.prog = opencl_build_program(ctrl.ctx, ctrl.device, "kernels.cl", compile_opts);
@@ -192,6 +192,11 @@ void freeOclBuffKers() {
     clReleaseMemObject(buffs.dB);
     clReleaseMemObject(buffs.dAtr);
     clReleaseMemObject(buffs.dBtr);
+}
+
+inline
+real arithmFun(real accum, real a) {
+    return (a*a - accum);  // sqrt(accum) + a*a;
 }
 
 #endif // TRANSP_HELPER

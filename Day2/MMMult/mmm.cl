@@ -1,8 +1,6 @@
 #ifndef MMM_KERNELS
 #define MMM_KERNELS
 
-#include "bridge.h"
-
 typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;

@@ -1,5 +1,5 @@
 PROGRAMS=mmm
-INCLUDES=mmm.h bridge.h ../../clutils.h
+INCLUDES=mmm.h ../../clutils.h
 
 include ../../common.mk
 

@@ -1,7 +1,13 @@
 #include "../../clutils.h"
 #include <math.h>
-#include "bridge.h"
+
+#define TILE     16
+#define RT       16
+typedef float real;
+#define REAL_STR "float"
+
 #include "mmm.h"
+
 
 #define HEIGHT_A 1024 //537
 #define WIDTH_A  256  //422
