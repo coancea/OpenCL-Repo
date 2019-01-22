@@ -54,10 +54,10 @@ cl_int runScan(IncScanBuffs arrs) {
     }
 
     {   // run scan on the group resulted from the group-reduction kernel
-        const size_t  localWorkSize = NUM_GROUPS_SCAN;
+		const size_t  localWorkSize = MAX_WORKGROUP_SIZE; //NUM_GROUPS_SCAN;
         error |= clSetKernelArg(kers.shortScan, 0, sizeof(uint32_t), (void *)&num_groups);
         error |= clSetKernelArg(kers.shortScan, 1, sizeof(cl_mem), (void*)&arrs.tmp); // input
-        error |= clSetKernelArg(kers.shortScan, 2, NUM_GROUPS_SCAN * sizeof(ElTp), NULL);
+        error |= clSetKernelArg(kers.shortScan, 2, localWorkSize * sizeof(ElTp), NULL);
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.shortScan, 1, NULL,
                                         &localWorkSize, &localWorkSize, 0, NULL, NULL);
@@ -142,12 +142,12 @@ cl_int runSgmScan(SgmScanBuffs arrs) {
     }
 
     {   // run scan on the group resulted from the group-reduction kernel
-        const size_t  localWorkSize = NUM_GROUPS_SCAN;
+		const size_t  localWorkSize = MAX_WORKGROUP_SIZE; // NUM_GROUPS_SCAN;
         error |= clSetKernelArg(kers.shortSgmScan, 0, sizeof(uint32_t), (void *)&num_groups);
         error |= clSetKernelArg(kers.shortSgmScan, 1, sizeof(cl_mem), (void*)&arrs.tmp_flg); // input
         error |= clSetKernelArg(kers.shortSgmScan, 2, sizeof(cl_mem), (void*)&arrs.tmp_val); // input
-        error |= clSetKernelArg(kers.shortSgmScan, 3, NUM_GROUPS_SCAN * sizeof(ElTp), NULL);
-        error |= clSetKernelArg(kers.shortSgmScan, 4, NUM_GROUPS_SCAN * sizeof(uint32_t), NULL);
+        error |= clSetKernelArg(kers.shortSgmScan, 3, localWorkSize * sizeof(ElTp), NULL);
+        error |= clSetKernelArg(kers.shortSgmScan, 4, localWorkSize * sizeof(uint32_t), NULL);
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.shortSgmScan, 1, NULL,
                                         &localWorkSize, &localWorkSize, 0, NULL, NULL);

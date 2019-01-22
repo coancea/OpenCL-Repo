@@ -4,13 +4,14 @@
 typedef int32_t     ElTp;
 #define ElTp_STR    "int32_t"
 #define NE          0
-#define lgWARP      5
+#define lgWARP      6
 #define WARP        (1<<lgWARP)
 
+#define WORKGROUP_SIZE      64
+#define MAX_WORKGROUP_SIZE  256 // for AMD, 1024 for NVIDIA
 #define NUM_GROUPS_SCAN     1024
-#define WORKGROUP_SIZE      256
 #define RUNS_GPU            200
-#define ELEMS_PER_THREAD    7
+#define ELEMS_PER_THREAD    4
 
 /**
  * CODE CLONEs!!! 
@@ -91,7 +92,7 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     }
 
     // finally sparse-matrix vector multiplication
-    profileSpMatVectMul(arrs, cpu_inp);
+    //profileSpMatVectMul(arrs, cpu_inp);
 
     printf("\n");
 
