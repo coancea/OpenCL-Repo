@@ -176,11 +176,11 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpRed, 1, NULL,
                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-        OPENCL_SUCCEED(error);
+        //OPENCL_SUCCEED(error);
     }
 
     {   // run scan on the group resulted from the group-reduction kernel
-        const size_t  localWorkSize  = NUM_GROUPS_SCAN;
+		const size_t  localWorkSize = MAX_WORKGROUP_SIZE; //NUM_GROUPS_SCAN;
         const size_t  local_size = 2 * localWorkSize * sizeof(int32_t);
         error |= clSetKernelArg(kers.shortScan, 0, sizeof(uint32_t), (void *)&num_groups);
         error |= clSetKernelArg(kers.shortScan, 1, sizeof(cl_mem), (void*)&arrs.tmpT); // input
@@ -189,7 +189,7 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.shortScan, 1, NULL,
                                         &localWorkSize, &localWorkSize, 0, NULL, NULL);
-        OPENCL_SUCCEED(error);
+        //OPENCL_SUCCEED(error);
     }
 
     {   // run intra-block scan kernel while accumulating from the result of the previous step
@@ -204,7 +204,7 @@ cl_int runPartition(PartitionBuffs arrs) {
 
         error |= clEnqueueNDRangeKernel(ctrl.queue, kers.grpScan, 1, NULL,
                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-        OPENCL_SUCCEED(error);
+        //OPENCL_SUCCEED(error);
     }
     return error;
 }
