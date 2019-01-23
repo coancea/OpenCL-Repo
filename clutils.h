@@ -262,7 +262,7 @@ static void opencl_init_command_queue(unsigned int platform_index, unsigned int 
   *ctx = clCreateContext(properties, 1, device, NULL, NULL, &error);
   OPENCL_SUCCEED(error);
 
-  *queue = clCreateCommandQueue(*ctx, *device, 0, &error);
+  *queue = clCreateCommandQueue(*ctx, *device, CL_QUEUE_PROFILING_ENABLE, &error);
   OPENCL_SUCCEED(error);
 
   free(all_platforms);
