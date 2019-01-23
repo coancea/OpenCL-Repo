@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
 
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
-      cells[i*n+j] = random() % 2;
+      cells[i*n+j] = rand() % 2;
     }
   }
 
