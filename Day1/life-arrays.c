@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     iters = atoi(argv[3]);
   }
 
-  printf("Game of Life on a %d by %d grid.\n", n, m);
+  printf("Game of Life on a %d by %d grid; %d iterations.\n", n, m, iters);
 
   cl_context ctx;
   cl_command_queue queue;
@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
 
   cl_int *cells = malloc(n * m * sizeof(cl_int));
 
+  srand(123); // Ensure predictable image.
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       cells[i*n+j] = rand() % 2;

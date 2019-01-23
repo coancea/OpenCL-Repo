@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     iters = atoi(argv[3]);
   }
 
-  printf("Game of Life on a %d by %d grid.\n", n, m);
+  printf("Game of Life on a %d by %d grid; %d iterations.\n", n, m, iters);
 
   cl_context ctx;
   cl_command_queue queue;
@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
 
   cl_int *cells = malloc(n * m * sizeof(cl_int));
 
+  srand(123); // Ensure predictable image.
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < m; j++) {
       cells[i*m+j] = rand() % 2;
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
       .image_height = n,
       .image_depth = 1, // Not used in 2D case.
       .image_array_size = 0, // Only used for image arrays.
-      .image_row_pitch = m * sizeof(cl_int), // Pitch per row.
+      .image_row_pitch = 0, // Pitch per row (0 makes it compute it automatically).
       .image_slice_pitch = 0, // Only used for 3D images and image arrays.
       .num_mip_levels = 0, // Must be 0.
       .num_samples = 0, // Must be 0.
