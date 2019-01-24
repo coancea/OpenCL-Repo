@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
                                          sizeof(t),
                                          &t,
                                          NULL));
-  printf("write CL_PROFILING_COMMAND_SUBMIT: %ld (+%ld)\n", (long)t, (long)t-bef_t);
+  printf("write CL_PROFILING_COMMAND_SUBMIT: %ld (+%ld)\n", (long)t, (long)(t-bef_t));
   bef_t = t;
 
   OPENCL_SUCCEED(clGetEventProfilingInfo(write_e,
@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
                                          sizeof(t),
                                          &t,
                                          NULL));
-  printf("write CL_PROFILING_COMMAND_START: %ld (+%ld)\n", (long)t, (long)t-bef_t);
+  printf("write CL_PROFILING_COMMAND_START: %ld (+%ld)\n", (long)t, (long)(t-bef_t));
   bef_t = t;
 
   OPENCL_SUCCEED(clGetEventProfilingInfo(write_e,
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
                                          sizeof(t),
                                          &t,
                                          NULL));
-  printf("write CL_PROFILING_COMMAND_END: %ld (+%ld)\n", (long)t, (long)t-bef_t);
+  printf("write CL_PROFILING_COMMAND_END: %ld (+%ld)\n", (long)t, (long)(t-bef_t));
   bef_t = t;
 
   for (int i = 0; i < runs; i++) {
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
                                              sizeof(t),
                                              &t,
                                              NULL));
-      printf("kernel %d runtime: %ld\n", i, (long)t-bef_t);
+      printf("kernel %d runtime: %ld\n", i, (long)(t-bef_t));
   }
 
 }
