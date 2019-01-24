@@ -9,7 +9,6 @@ int main(int argc, char** argv) {
     n = atoi(argv[1]);
   }
   printf("Rot-13 on %d characters\n", n);
-  printf("Timing in nanoseconds\n");
 
   cl_context ctx;
   cl_command_queue queue;
@@ -104,6 +103,8 @@ int main(int argc, char** argv) {
   printf("write CL_PROFILING_COMMAND_END: %ld (+%ld)\n", (long)t, (long)(t-bef_t));
   bef_t = t;
 
+  OPENCL_SUCCEED(clReleaseEvent(write_e));
+
   for (int i = 0; i < runs; i++) {
       OPENCL_SUCCEED(clGetEventProfilingInfo(kernel_events[i],
                                              CL_PROFILING_COMMAND_START,
@@ -115,7 +116,8 @@ int main(int argc, char** argv) {
                                              sizeof(t),
                                              &t,
                                              NULL));
-      printf("kernel %d runtime: %ld\n", i, (long)(t-bef_t));
-  }
+      printf("kernel %d runtime: %ldus\n", i, (long)(t-bef_t)/1000);
 
+      OPENCL_SUCCEED(clReleaseEvent(kernel_events[i]));
+  }
 }
