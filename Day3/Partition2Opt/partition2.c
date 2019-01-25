@@ -9,12 +9,13 @@ inline uint32_t pred(int32_t k) {
     return (1 - (k & 1));
 }
 
-#define lgWARP              5
+#define lgWARP              6 // for AMD, 5 for NVIDIA
 #define WARP                (1<<lgWARP)
+#define MAX_WORKGROUP_SIZE  256 // for AMD, 1024 for NVIDIA
 
 #define NUM_GROUPS_SCAN     1024
-#define WORKGROUP_SIZE      256
-#define ELEMS_PER_THREAD    9
+#define WORKGROUP_SIZE      64 //256 
+#define ELEMS_PER_THREAD    4 //for AMD, 9 for NVIDIA
 #define RUNS_GPU            300
 
 

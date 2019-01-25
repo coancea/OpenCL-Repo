@@ -79,6 +79,10 @@ incScanGroup ( __local volatile ElTp*   sh_data, const size_t tid) {
 
     // perform scan at warp level
     ElTp res = incScanWarp(sh_data, tid);
+
+	// optimize for when the workgroup-size is exactly one WAVE
+	if(get_local_size(0) == WARP) { return res; }
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // if last thread in a warp, record it at the beginning of sh_data
@@ -151,18 +155,25 @@ __kernel void shortScanKer(
         __global ElTp*      arr,      // read-only,   [N]
         volatile __local  ElTp* locmem  // local memory [group-size]
 ) {
+	const uint32_t group_size = get_local_size(0);
     const uint32_t tid = get_local_id(0);
-    const uint32_t gid = get_global_id(0);
+    uint32_t gid = tid;
     ElTp acc = NE;
-    if (gid < N) {
-        acc = arr[gid];
-    }
-    locmem[tid] = acc;
-    barrier(CLK_LOCAL_MEM_FENCE);
-    acc = incScanGroup(locmem, tid);
-    if(gid < N) {
-        arr[gid] = acc;
-    }
+	for(uint32_t k = 0; k < N; k += group_size, gid += group_size) {
+		ElTp cur = NE;
+		if (gid < N) {
+			cur = arr[gid];
+		}
+		locmem[tid] = cur;
+		barrier(CLK_LOCAL_MEM_FENCE);
+		cur = incScanGroup(locmem, tid);
+		if(gid < N) {
+			arr[gid] = binOp(acc, cur);
+		}
+		cur = locmem[group_size-1];
+		acc = binOp(acc, cur);
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
 }
 
 __kernel void scanPhaseKer ( 
@@ -275,6 +286,10 @@ incSgmScanGroup( __local volatile uint32_t* sh_flag
 
     // perform scan at warp level
     FlgTuple res = incSgmScanWarp(sh_flag, sh_data, tid);
+
+	// optimize for when the workgroup-size is exactly one WAVE
+	if(get_local_size(0) == WARP) { return res; }
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // if last thread in a warp, record it at the beginning of sh_data
@@ -387,21 +402,31 @@ __kernel void shortSgmScanKer(
         volatile __local  ElTp*    locmem_val,  // local memory [group-size]
         volatile __local  uint32_t* locmem_flg   // local memory [group-size]
 ) {
+	const uint32_t group_size = get_local_size(0);
     const uint32_t tid = get_local_id(0);
-    const uint32_t gid = get_global_id(0);
-    FlgTuple res; res.flg = 0; res.val = NE;
-    if (gid < N) {
-        res.flg = arr_flg[gid];
-        res.val = arr_val[gid];
-    }
-    locmem_flg[tid] = res.flg;
-    locmem_val[tid] = res.val;
-    barrier(CLK_LOCAL_MEM_FENCE);
-    res = incSgmScanGroup(locmem_flg, locmem_val, tid);
-    if(gid < N) {
-        arr_flg[gid] = res.flg;
-        arr_val[gid] = res.val;
-    }
+    uint32_t gid = tid;
+    FlgTuple acc; acc.flg = 0; acc.val = NE;
+
+	for(uint32_t k = 0; k < N; k += group_size, gid += group_size) {
+		FlgTuple cur; cur.flg = 0; cur.val = NE;
+		if (gid < N) {
+			cur.flg = arr_flg[gid];
+			cur.val = arr_val[gid];
+		}
+		locmem_flg[tid] = cur.flg;
+		locmem_val[tid] = cur.val;
+		barrier(CLK_LOCAL_MEM_FENCE);
+		cur = incSgmScanGroup(locmem_flg, locmem_val, tid);
+		if(gid < N) {
+			cur = binOpFlg(acc, cur);
+			arr_flg[gid] = cur.flg;
+			arr_val[gid] = cur.val;
+		}
+		cur.flg = locmem_flg[group_size-1];
+		cur.val = locmem_val[group_size-1];
+		acc = binOpFlg(acc, cur);
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
 }
 
 __kernel void scanPhaseSgmKer ( 
@@ -553,7 +578,7 @@ __kernel void scatterPartKer(
         ElTp el = inp[gid];
         uint32_t v = pred(el);
         uint32_t  ind = 0;
-        __global uint32_t* ptr = NULL;
+        __global uint32_t* ptr;
         uint32_t i = isT[N-1];
         if(v == 1) { ptr = isT; } else { ptr = isF; ind = i; }
         ind += ptr[gid];

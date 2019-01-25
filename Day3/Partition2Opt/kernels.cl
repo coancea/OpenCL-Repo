@@ -48,6 +48,10 @@ incScanGroup ( __local volatile int32_t*   sh_data_x,
 
     // perform scan at warp level
     int2 res = incScanWarp(sh_data_x, sh_data_y, tid);
+
+	// optimize for when the workgroup-size is exactly one WAVE
+	if(get_local_size(0) == WARP) { return res; }
+
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // if last thread in a warp, record it at the beginning of sh_data
@@ -143,6 +147,7 @@ __kernel void shortScanKer(
         cur.x = locmem_x[get_local_size(0)-1];
         cur.y = locmem_y[get_local_size(0)-1];
         acc = binOp(acc, cur);
+		barrier(CLK_LOCAL_MEM_FENCE);
     }
 }
 
