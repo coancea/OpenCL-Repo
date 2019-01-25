@@ -70,19 +70,22 @@ void runGPUverMMM(Version kind, real* hC, real* hdC) {
     size_t localWorkSize[2];
     size_t globalWorkSize[2];
     cl_kernel kernel;
-
+    size_t dummy = 8;
+    // All the sizes are dummy here; pleaze fill them in correctly.
     if ( (kind == NAIVE) || (kind == BLOCK) ) {
+        // here use tile size: TILE
         kernel = (kind == NAIVE) ? kers.naiveMMM : kers.blockMMM;
-        localWorkSize [0] = TILE;
-        localWorkSize [1] = TILE;
-        globalWorkSize[0] = mkGlobalDim(buffs.widthB , TILE );
-        globalWorkSize[1] = mkGlobalDim(buffs.heightA, TILE );
+        localWorkSize [0] = dummy;
+        localWorkSize [1] = dummy;
+        globalWorkSize[0] = dummy;
+        globalWorkSize[1] = dummy;
     } else { // treat the case for the register + block tiling.
+        // here use tile size: RT
         kernel = kers.rgblkMMM;
-        localWorkSize [0] = RT;
-        localWorkSize [1] = RT;
-        globalWorkSize[0] = ( (buffs.widthB + RT*RT - 1) / (RT*RT) ) * RT;
-        globalWorkSize[1] = mkGlobalDim(buffs.heightA, RT );
+        localWorkSize [0] = dummy;
+        localWorkSize [1] = dummy;
+        globalWorkSize[0] = dummy;
+        globalWorkSize[1] = dummy;
     }
 
     { // run kernel

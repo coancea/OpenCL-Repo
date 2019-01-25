@@ -81,8 +81,8 @@ void runGPUverMMM(Version kind, real* hC, real* hdC) {
         kernel = kers.rgblkMMM;
         localWorkSize [0] = RT;
         localWorkSize [1] = RT;
-        globalWorkSize[0] = ( (buffs.widthB + RT*RT - 1) / (RT*RT) ) * RT;
-        globalWorkSize[1] = mkGlobalDim(buffs.heightA, RT );
+        globalWorkSize[0] = mkGlobalDim(buffs.widthB, RT*RT ); //( (buffs.widthB + RT*RT - 1) / (RT*RT) ) * RT;
+        globalWorkSize[1] = (buffs.heightA + RT - 1) / RT;     //mkGlobalDim(buffs.heightA, RT );
     }
 
     { // run kernel
