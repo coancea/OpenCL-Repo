@@ -55,7 +55,7 @@ void goldMMM(real* A, real* B, real* C, uint32_t rowsA, uint32_t colsB, uint32_t
 
 void validate(real* A, real* B, uint32_t sizeAB){
     for(uint32_t i = 0; i < sizeAB; i++)
-      if (fabs(A[i] - B[i]) > 0.0005){
+      if (fabs(A[i] - B[i]) > 0.00005){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
         return;
       }
