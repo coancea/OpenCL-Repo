@@ -4,6 +4,7 @@
 \setbeamerfont{frametitle}{family=\bf}
 \usepackage{listings}
 \usepackage{pdfpages}
+\usepackage{verbatim}
 
 \lstset{
   language=C,
@@ -422,7 +423,7 @@ for (unsigned int j = 0; j < num_devices; j++) {
 \end{lstlisting}
 \end{frame}
 
-\begin{frame}
+\begin{frame}[fragile]
   \frametitle{OpenCL in Visual Studio}
 
   \begin{block}{Warning}
@@ -430,10 +431,23 @@ for (unsigned int j = 0; j < num_devices; j++) {
     unexperienced with Visual Studio.
   \end{block}
 
-  \begin{enumerate}
+  \begin{itemize}
   \item Ensure the AMD OpenCL SDK is installed.
-  \item Do lots of things...
-  \end{enumerate}
+  \item After creating a new project, edit its properties and set...
+    \begin{enumerate}
+    \item \textit{C/C++$\rightarrow$SDL checks} to No.
+    \item \textit{C/C++$\rightarrow$Additional Include Directories}
+      add \verb!C:\Program Files (x86)\AMD APP SDK\3.0\include!.
+    \item \textit{Linker$\rightarrow$Additional Library Directories}
+      add \verb!C:\Program Files (x86)\AMD APP SDK\3.0\lib!.
+    \item \textit{Linker$\rightarrow$Input$\rightarrow$Additional
+        Dependencies} add \verb!OpenCL.lib!.
+    \end{enumerate}
+  \item All but step 1 can be done by using the
+    \texttt{AMDOpenCL.props} property sheet in the Git repository.
+  \item Make sure you are doing a 64-bit build (VS calls this
+    ``x64'').
+  \end{itemize}
 
 \end{frame}
 
@@ -571,7 +585,10 @@ output.
   again; let's just use \texttt{clutils.h}:
 
 \begin{lstlisting}
-cl_program program = opencl_build_program(ctx, device, "kernels/rot13.cl", "");
+cl_program program =
+  opencl_build_program(ctx, device,
+                       "kernels/rot13.cl",
+                       "");
 \end{lstlisting}
 
   OpenCL C is a cut-down dialect of C with many restrictions:
@@ -619,7 +636,8 @@ kernel void rot13(global char *out,
   got back:
 
 \begin{lstlisting}
-cl_kernel rot13_k = clCreateKernel(program, "rot13", &error);
+cl_kernel rot13_k =
+  clCreateKernel(program, "rot13", &error);
 OPENCL_SUCCEED(error);
 \end{lstlisting}
 
