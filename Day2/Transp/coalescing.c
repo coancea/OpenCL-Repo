@@ -5,8 +5,7 @@ typedef float real;
 #define REAL_STR "float"
 
 #define TILE   16
-#define CHUNK  16   // CHUNK must divide TILE^2
-#define PRG_WGSIZE (CHUNK*8)
+#define CHUNK  8   // CHUNK must divide TILE^2
 #define HEIGHT 67537
 #define WIDTH  64
 
@@ -186,8 +185,8 @@ void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
 }
 
 void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
-	size_t localWorkSize = PRG_WGSIZE; 
-    size_t globalWorkSize = mkGlobalDim(buffs.height, localWorkSize);
+    size_t localWorkSize  = TILE*TILE;
+    size_t globalWorkSize = mkGlobalDim(buffs.height, TILE*TILE );
     cl_kernel kernel = (vers == NAIVE_PROGRM) ? kers.naiveProgrm : kers.optimProgrm;
     { // run kernel
         cl_int ciErr1 = CL_SUCCESS;
@@ -212,7 +211,7 @@ void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
         elapsed = aft - bef;
         OPENCL_SUCCEED(ciErr1);
         {
-            double microsecPerTransp = ((double)elapsed)/RUNS_GPU; 
+            double microsecPerTransp = elapsed/RUNS_GPU; 
             double bytesaccessed = 2 * buffs.height * buffs.width * sizeof(real); // one read + one write
             double gigaBytesPerSec = (bytesaccessed * 1.0e-9f) / (microsecPerTransp / (1000.0f * 1000.0f));
             if      (vers == NAIVE_PROGRM) printf("GPU Naive ");

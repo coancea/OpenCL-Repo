@@ -55,7 +55,7 @@ void goldMMM(real* A, real* B, real* C, uint32_t rowsA, uint32_t colsB, uint32_t
 
 void validate(real* A, real* B, uint32_t sizeAB){
     for(uint32_t i = 0; i < sizeAB; i++)
-      if (fabs(A[i] - B[i]) > 0.0005){
+      if (fabs(A[i] - B[i]) > 0.00005){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
         return;
       }
@@ -70,22 +70,19 @@ void runGPUverMMM(Version kind, real* hC, real* hdC) {
     size_t localWorkSize[2];
     size_t globalWorkSize[2];
     cl_kernel kernel;
-    size_t dummy = 8;
-    // All the sizes are dummy here; pleaze fill them in correctly.
+
     if ( (kind == NAIVE) || (kind == BLOCK) ) {
-        // here use tile size: TILE
         kernel = (kind == NAIVE) ? kers.naiveMMM : kers.blockMMM;
-        localWorkSize [0] = dummy;
-        localWorkSize [1] = dummy;
-        globalWorkSize[0] = dummy;
-        globalWorkSize[1] = dummy;
+        localWorkSize [0] = TILE;
+        localWorkSize [1] = TILE;
+        globalWorkSize[0] = mkGlobalDim(buffs.widthB , TILE );
+        globalWorkSize[1] = mkGlobalDim(buffs.heightA, TILE );
     } else { // treat the case for the register + block tiling.
-        // here use tile size: RT
         kernel = kers.rgblkMMM;
-        localWorkSize [0] = dummy;
-        localWorkSize [1] = dummy;
-        globalWorkSize[0] = dummy;
-        globalWorkSize[1] = dummy;
+        localWorkSize [0] = RT;
+        localWorkSize [1] = RT;
+        globalWorkSize[0] = mkGlobalDim(buffs.widthB, RT*RT ); //( (buffs.widthB + RT*RT - 1) / (RT*RT) ) * RT;
+        globalWorkSize[1] = (buffs.heightA + RT - 1) / RT;     //mkGlobalDim(buffs.heightA, RT );
     }
 
     { // run kernel

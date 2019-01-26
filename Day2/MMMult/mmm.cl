@@ -33,7 +33,33 @@ __kernel void blockMMM  ( __global real* A
 ) {
     __local real Ash[TILE][TILE];
     __local real Bsh[TILE][TILE]; 
-    // add implementation here
+
+    real accum = 0.0;
+    uint32_t gidx = get_global_id(0);
+    uint32_t gidy = get_global_id(1);
+    uint32_t lidx = get_local_id(0);
+    uint32_t lidy = get_local_id(1);
+    
+    for(uint32_t kk = 0; kk < widthA; kk += TILE) {
+        real tmp = 0.0;
+        if ((gidy < heightA) && (kk+lidx < widthA))
+            tmp = A[gidy*widthA + kk + lidx];
+        Ash[lidy][lidx] = tmp;
+
+        tmp = 0.0;
+        if ((gidx < widthB)  && (kk+lidy < widthA)) 
+            tmp = B[(lidy+kk)*widthB + gidx];
+        Bsh[lidy][lidx] = tmp;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        #pragma unroll
+        for(int k = 0; k < TILE; k++)
+            accum += Ash[lidy][k] * Bsh[k][lidx];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if( (gidx < widthB) && (gidy < heightA) )
+        C[gidy*widthB + gidx] = accum;
 }
 
 __kernel void rgblkMMM  ( __global real* A
