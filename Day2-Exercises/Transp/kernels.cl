@@ -106,74 +106,99 @@ __kernel void naiveProgrm( __global real* A
     }
 }
 
-__kernel void coalsProgrm( __global real* A
-                         , __global real* B
+/**
+ * Exercise 1 (Optimize coalescing by transposition): 
+ *    ToDo: Implement the kernel below that reads/writes
+ *          from/to the transposed version of A and B!
+ *    Note: "height" and "width" are the height and 
+ *          width of "A" not of "Atr" (transpose of "A")!
+ */
+__kernel void coalsProgrm( __global real* Atr
+                         , __global real* Btr
                          , uint32_t height
                          , uint32_t width 
 ) {
-    uint32_t gid = get_global_id(0); 
-    real     accum  = 0.0;
-
-    if( gid >= height ) return;
-
-    for(uint32_t j = 0; j < width; j++,gid+=height) {
-        real tmpA = A[gid];
-        accum = arithmFun(accum, tmpA);
-        B[gid] = accum;
-    }
 }
 
+/**
+ * Exercise 2 (Optimize coalescing by transposition): 
+ *    ToDo: complete the implementation of the kernel below which
+ *          processes a row of "A" per thread by streaming it,
+ *          i.e., each threads processes CHUNK elements on its row
+ *          of "A" at a time by:
+ *          1. collectively reading "A" from global to local memory
+ *             in coalesced fashion (IMPLEMENT),
+ *          2. performing the original computation on its chunk, whose
+ *             result is written to local memory ("CHUNK" elements of "B");
+ *             THIS IS ALREADY IMPLEMENTED -- nothing to do here!
+ *          3. collectively writing to global memory (of "B") in coalesced
+ *             fashion (IMPLEMENT)
+ *    Notes:
+ *    "PRG_WGSIZE" denotes the local workgroup size, and is a multiple of "CHUNK".
+ *    For best performance "CHUNK=16" since it results in fully coalesced access.
+ *    However, 16 words of local memory per thread will likely affect occupancy
+ *      (negatively).
+ */
 __kernel void optimProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width
 ) {
-    // Assumes that GROUP-SIZE is PRG_WGSIZE and PRG_WGSIZE is a multiple of CHUNK
+    // scratchpad "fast" memory
 	volatile __local real lmem[PRG_WGSIZE][CHUNK+1]; 
     uint32_t gid        = get_global_id(0);
     uint32_t lid        = get_local_id(0);
     uint32_t chunk_lane = lid % CHUNK;
-    uint32_t num_elem   = width * height;
+    uint32_t tot_num_elem = width * height;
 
     real     accum  = 0.0;
-    uint32_t offs_y = (get_group_id(0)*get_local_size(0) + (lid/CHUNK)) * width;
-    uint32_t step_y = (get_local_size(0)/CHUNK)*width;
+    uint32_t offs_y = get_group_id(0)*get_local_size(0) + (lid/CHUNK);
+    uint32_t step_y = get_local_size(0) / CHUNK;
 
+    // In each iteration, each thread processes CHUNK elements of its row (of A/B)
     for(uint32_t j = 0; j < width; j+=CHUNK) {
-        // load in shared memory
-        #pragma unroll
-        for(uint32_t k = 0, ind_y = offs_y; k < CHUNK; k++, ind_y+=step_y) {
-            real tmp = 0.0;
-            uint32_t ind_x = chunk_lane + j;
-            if ((ind_y < num_elem) && (ind_x < width))
-                tmp = A[ind_y + ind_x];
-            //lmem[lid + k*get_local_size(0)] = tmp;
-            uint32_t l_index = lid + k*get_local_size(0);
-            lmem[l_index / CHUNK][l_index % CHUNK] = tmp;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);  
 
-        // execute original but with reads/writes from local memory
-        #pragma unroll
-        for(uint32_t k = 0; k < CHUNK; k++) {
-            if( (j + k < width) && (gid < height)) {
-                real tmpA = lmem[lid][k]; //A[gid*width+j];
-                accum = arithmFun(accum, tmpA);
-                //B[gid*width + j + k] = accum;
-                lmem[lid][k] = accum;
+        { // 1. read from "A" in coalesced fasion and place the result in local memory
+          //    Implement this loop by writing proper computation instead of dummies!
+            #pragma unroll
+            for(uint32_t k = 0, ind_y = offs_y; k < CHUNK; k++, ind_y+=step_y) {
+                uint32_t dummy = 0;
+                uint32_t flat_loc_index = dummy;
+                uint32_t ind_x = dummy;
+                lmem[dummy][dummy] =
+                    ((dummy < height) && (dummy < width)) ? A[dummy*width + dummy] : 0.0;
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        { // 2. execute original but with reads/writes from/to local memory
+          //    NOTHING TO DO HERE: already implemented!
+            #pragma unroll
+            for(uint32_t k = 0; k < CHUNK; k++) {
+                if( (j + k < width) && (gid < height)) {
+                    real tmpA = lmem[lid][k]; //A[gid*width+j];
+                    accum = arithmFun(accum, tmpA);
+                    //B[gid*width + j + k] = accum;
+                    lmem[lid][k] = accum;
+                }
             }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        // write back from local to global memory in coalesced fashion
-        #pragma unroll
-        for(uint32_t k = 0, ind_y = offs_y; k < CHUNK; k++, ind_y+=step_y) {
-            uint32_t ind_x = chunk_lane + j;
-            //real tmp = lmem[lid + k*get_local_size(0)];
-            uint32_t l_index = lid + k*get_local_size(0);
-            real tmp = lmem[l_index / CHUNK][l_index % CHUNK];
-            if ((ind_y < num_elem) && (ind_x < width))
-                B[ind_y + ind_x] = tmp;
+        { // 3. read from "A" in coalesced fasion and place the result in local memory
+          //    Implement this loop by writing proper computation instead of dummies!
+          //    This is very similar to 1.
+            #pragma unroll
+            for(uint32_t k = 0, ind_y = offs_y; k < CHUNK; k++, ind_y+=step_y) {
+                uint32_t dummy = 0;
+                uint32_t flat_loc_index = dummy;
+                uint32_t ind_x = dummy;
+                real tmp = lmem[dummy][dummy];
+
+                if ((dummy < height) && (dummy < width))
+                    B[dummy*width + dummy] = tmp;
+            }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }

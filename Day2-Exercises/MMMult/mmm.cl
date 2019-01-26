@@ -24,6 +24,11 @@ __kernel void naiveMMM  ( __global real* A
     C[gidy*widthB + gidx] = accum;
 }
 
+/**
+ * Implement block-tile matrix-matrix multiplication kernel below.
+ * TILE is the tile size (e.g., 16)
+ * For local-memory barriers use: "barrier(CLK_LOCAL_MEM_FENCE);"
+ */ 
 __kernel void blockMMM  ( __global real* A
                         , __global real* B
                         , __global real* C
@@ -36,6 +41,11 @@ __kernel void blockMMM  ( __global real* A
     // add implementation here
 }
 
+/**
+ * Implement register+block tiling for the matrix-matrix multiplication kernel below.
+ * RT is the tile size (e.g., 16)
+ * For local-memory barriers use: "barrier(CLK_LOCAL_MEM_FENCE);"
+ */ 
 __kernel void rgblkMMM  ( __global real* A
                         , __global real* B
                         , __global real* C
@@ -45,41 +55,6 @@ __kernel void rgblkMMM  ( __global real* A
 ) { 
     __local real Ash[RT][RT+1];
     real cs[RT]; 
-
-    uint32_t ii  = get_group_id(1) * RT;     
-    uint32_t jjj = get_group_id(0) * RT * RT;
-    uint32_t jj  = jjj + get_local_id(1) * RT;
-    uint32_t j   = jj  + get_local_id(0); 
-
-    #pragma unroll
-    for(int i=0; i<RT; i++)
-        cs[i] = 0.0;
-
-    for(int kk = 0; kk < widthA; kk += RT) {
-        real tmp = 0.0;
-        if ((ii+get_local_id(1) < heightA) && (kk+get_local_id(0) < widthA)) {
-            tmp = A[(ii+get_local_id(1))*widthA + kk+get_local_id(0)];
-        }
-        Ash[get_local_id(1)][get_local_id(0)] = tmp;
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        for(int k = 0; k < RT; k++) {
-            real b = 0.0;
-            if ((k+kk < widthA) && (j < widthB)) {
-                b = B[(k+kk)*widthB + j];
-            }
-            #pragma unroll 
-            for(int i = 0; i < RT; i++) {
-                cs[i] += Ash[i][k] * b;
-            }
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    #pragma unroll
-    for(int i=0; i<RT; i++) {
-        if( (ii+i < heightA) && (j < widthB) )
-            C[(ii+i)*widthB + j] = cs[i];
-    }
+    // add implementation here
 }
 #endif //MMM_KERNELS

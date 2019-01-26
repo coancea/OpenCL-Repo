@@ -185,7 +185,7 @@ void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
     }
 }
 
-void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
+void timeGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
 	size_t localWorkSize = PRG_WGSIZE; 
     size_t globalWorkSize = mkGlobalDim(buffs.height, localWorkSize);
     cl_kernel kernel = (vers == NAIVE_PROGRM) ? kers.naiveProgrm : kers.optimProgrm;
@@ -204,7 +204,6 @@ void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
             for (int32_t i = 0; i < RUNS_GPU; i++) {
                 ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kernel, 1, NULL,
                                                  &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-                OPENCL_SUCCEED(ciErr1);
             }
             clFinish(ctrl.queue);
         }
@@ -230,38 +229,60 @@ void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
     }
 }
 
-void runGPUcoalsProgram(real* hB, real* hdB) {
-    size_t localWorkSize  = TILE*TILE;
-    size_t globalWorkSize = mkGlobalDim(buffs.height, TILE*TILE );
-    size_t localTransp[2] = {TILE, TILE};
-    size_t globalTransp1[2]= {mkGlobalDim(buffs.width, TILE), mkGlobalDim(buffs.height, TILE)};
-    size_t globalTransp2[2]= {mkGlobalDim(buffs.height, TILE), mkGlobalDim(buffs.width, TILE)};
+/**
+ * Exercise 1 (Optimize coalescing by transposition): 
+ *    ToDo: 1.a) replace the dummy sizes with correct local/global work sizes
+ *               for the three kernels.
+ *          1.b) set the arguments for the transposition kernels
+ *               (look at "coalsTransp" kernel in "kernels.cl")
+ *          The tile-size for transposition should be TILE!
+ */
+cl_int runGPUcoalsProgram() {
+    cl_int ciErr1 = CL_SUCCESS;
+    const size_t dummy = 8;
+    // this is the local workgroup size for transposition!
+    // fill in the correct 
+    size_t localTransp[2] = {dummy, dummy};
+
+    { // transpose A into Atr
+        size_t globalTransp1[2]= {dummy, dummy};
+
+        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
+        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dAtr);
+        clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
+        clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
+        ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
+                                         globalTransp1, localTransp, 0, NULL, NULL);
+    }
+    { // execute coalesced program; the kernel arguments have been already set elsewhere
+        size_t localWorkSize  = dummy*dummy;
+        size_t globalWorkSize = dummy*dummy;
+
+        ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsProgrm, 1, NULL,
+                                         &globalWorkSize, &localWorkSize, 0, NULL, NULL);
+    }
+    { // transpose Btr into B
+        size_t globalTransp2[2]= {dummy, dummy};
+
+        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dBtr);
+        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
+        clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.width);
+        clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.height);
+        ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
+                                         globalTransp2, localTransp, 0, NULL, NULL);
+    }
+    return ciErr1;
+}
+
+
+void timeGPUcoalsProgram(real* hB, real* hdB) {
 
     { // run kernel
         cl_int ciErr1 = CL_SUCCESS;
         // make two dry runs
         for (int32_t i=0; i<1; i++) {
             // transpose A into Atr
-            clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
-            clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dAtr);
-            clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
-            clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
-            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
-                                             globalTransp1, localTransp, 0, NULL, NULL);
-            OPENCL_SUCCEED(ciErr1);
-            
-            // execute coalesced program
-            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsProgrm, 1, NULL,
-                                             &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-            OPENCL_SUCCEED(ciErr1);
-
-            // transpose Btr into B
-            clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dBtr);
-            clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
-            clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.width);
-            clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.height);
-            ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
-                                             globalTransp2, localTransp, 0, NULL, NULL);
+            ciErr1 |= runGPUcoalsProgram();
             clFinish(ctrl.queue);
             OPENCL_SUCCEED(ciErr1);
         }
@@ -269,26 +290,10 @@ void runGPUcoalsProgram(real* hB, real* hdB) {
         int64_t elapsed, aft, bef = get_wall_time();
         { // timing runs
             for (int32_t i = 0; i < RUNS_GPU; i++) {
-                // transpose A into Atr
-                clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
-                clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dAtr);
-                clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
-                clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
-                ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
-                                             globalTransp1, localTransp, 0, NULL, NULL);
-
-                // execute coalesced program
-                ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsProgrm, 1, NULL,
-                                                 &globalWorkSize, &localWorkSize, 0, NULL, NULL);
-                // transpose Btr into B
-                clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dBtr);
-                clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
-                clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.width);
-                clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.height);
-                ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsTransp, 2, NULL,
-                                                 globalTransp2, localTransp, 0, NULL, NULL);
+                ciErr1 |= runGPUcoalsProgram();
             }
             clFinish(ctrl.queue);
+            OPENCL_SUCCEED(ciErr1);
         }
         aft = get_wall_time();
         elapsed = aft - bef;
@@ -347,9 +352,9 @@ void testForSizes( const uint32_t height
     initProgramKernels();
 
     // run the gpu version of the program
-    runGPUnaive_or_optProgram(NAIVE_PROGRM, hB, hdB);
-    runGPUcoalsProgram(hB, hdB);
-    runGPUnaive_or_optProgram(OPTIM_PROGRM, hB, hdB);
+    timeGPUnaive_or_optProgram(NAIVE_PROGRM, hB, hdB);
+    timeGPUcoalsProgram(hB, hdB);
+    timeGPUnaive_or_optProgram(OPTIM_PROGRM, hB, hdB);
     printf("\n");
     // free Ocl Kernels and Buffers
     freeOclBuffKers();

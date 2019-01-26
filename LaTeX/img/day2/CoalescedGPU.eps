@@ -1,7 +1,7 @@
 %!PS-Adobe-3.0 EPSF-3.0
 %%Title: CoalescedGPU.fig
 %%Creator: fig2dev Version 3.2.6a
-%%CreationDate: 2018-09-23 15:32:36
+%%CreationDate: 2019-01-26 14:50:00
 %%BoundingBox: 0 0 580 197
 %Magnification: 1.0000
 %%EndComments
@@ -74,6 +74,9 @@ pageheader
 0 slj
 0 slc
 7.500 slw
+n 3780 1575 m 8235 1575 l 8235 1980 l 3780 1980 l
+ cp gs col0 s gr 
+% Polyline
 n 4950 1575 m
  4950 1980 l gs col0 s gr 
 % Polyline
@@ -82,15 +85,6 @@ n 6120 1575 m
 % Polyline
 n 6795 1575 m
  6795 1980 l gs col0 s gr 
-% Polyline
-n 1215 3465 m 10305 3465 l 10305 4275 l 1215 4275 l
- cp gs col0 s gr 
-% Polyline
-n 3420 3465 m
- 3420 4275 l gs col0 s gr 
-% Polyline
-n 4770 3465 m
- 4770 4275 l gs col0 s gr 
 % Polyline
 n 5985 3465 m
  5985 4275 l gs col0 s gr 
@@ -101,7 +95,13 @@ n 7155 3465 m
 n 8415 3465 m
  8415 4275 l gs col0 s gr 
 % Polyline
-n 3780 1575 m 8235 1575 l 8235 1980 l 3780 1980 l
+n 3420 3465 m
+ 3420 4275 l gs col0 s gr 
+% Polyline
+n 4770 3465 m
+ 4770 4275 l gs col0 s gr 
+% Polyline
+n 1215 3465 m 10305 3465 l 10305 4275 l 1215 4275 l
  cp gs col0 s gr 
 % Polyline
 30.000 slw
@@ -140,17 +140,14 @@ n 7350 1976 m
 n 7670 3177 m 7740 3313 l 7727 3160 l 7707 3197 l 7670 3177 l 
  cp gs 0.00 setgray ef gr  col0 s
 /Courier-Bold ff 285.75 scf sf
-6885 1890 m
-gs 1 -1 sc (32*k+31) col0 sh gr
-/Courier-Bold ff 285.75 scf sf
 3825 1890 m
-gs 1 -1 sc (32*k+0) col0 sh gr
-/Courier-Bold ff 285.75 scf sf
-6165 1890 m
-gs 1 -1 sc (...) col0 sh gr
+gs 1 -1 sc (16*k+0) col0 sh gr
 /Courier-Bold ff 285.75 scf sf
 4995 1890 m
-gs 1 -1 sc (32*k+1) col0 sh gr
+gs 1 -1 sc (16*k+1) col0 sh gr
+/Courier-Bold ff 285.75 scf sf
+6885 1890 m
+gs 1 -1 sc (16*k+15) col0 sh gr
 /Courier-Bold ff 285.75 scf sf
 4995 3735 m
 gs 1 -1 sc (word) col0 sh gr
@@ -158,17 +155,17 @@ gs 1 -1 sc (word) col0 sh gr
 5085 4095 m
 gs 1 -1 sc (q+1) col0 sh gr
 /Courier-Bold ff 285.75 scf sf
-7425 3765 m
-gs 1 -1 sc (word) col0 sh gr
-/Courier-Bold ff 285.75 scf sf
-7515 4125 m
-gs 1 -1 sc (q+31) col0 sh gr
-/Courier-Bold ff 285.75 scf sf
 3690 3780 m
 gs 1 -1 sc (word) col0 sh gr
 /Courier-Bold ff 285.75 scf sf
 3780 4140 m
 gs 1 -1 sc (q+0) col0 sh gr
+/Courier-Bold ff 285.75 scf sf
+7425 3765 m
+gs 1 -1 sc (word) col0 sh gr
+/Courier-Bold ff 285.75 scf sf
+7515 4125 m
+gs 1 -1 sc (q+15) col0 sh gr
 /Courier-Bold ff 285.75 scf sf
 6165 3960 m
 gs 1 -1 sc (.....) col0 sh gr
@@ -184,6 +181,9 @@ gs 1 -1 sc (SIMD Instruction:) col0 sh gr
 /Times-BoldItalic ff 285.75 scf sf
 1260 3285 m
 gs 1 -1 sc (Global Memory:) col0 sh gr
+/Courier-Bold ff 285.75 scf sf
+6165 1890 m
+gs 1 -1 sc (...) col0 sh gr
 % here ends figure;
 pagefooter
 showpage

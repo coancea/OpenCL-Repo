@@ -568,6 +568,277 @@ Assume the code above runs on a dataset having\\
 \end{itemize}
 \end{frame}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Spatial Locality
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Optimizing Spatial Locality (Coalesced Memory)}
+
+\begin{frame}[fragile]
+	\tableofcontents[currentsection]
+\end{frame}
+
+\subsection{Motivating Example on A Contrived Program}
+
+\begin{frame}[fragile,t]
+  \frametitle{Motivation: Coalesced Accesses to Global Memory} 
+
+Which are the parallel/sequential loops?
+
+\begin{columns}
+\column{0.42\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+real A[height][width];
+real B[height][width];
+// Non-Coalesced Access
+\emph{for(i=0; i<height; i++) \{}
+  real accum  = 0.0;
+
+  \emp{for(j=0; j<width; j++) \{}
+    real tmpA = A[i][j];
+    accum = tmpA*tmpA - accum;
+    B[i][j] = accum;
+  \}
+\}\pause
+\end{colorcode}
+\column{0.55\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+A' = transpose(A);
+// Coalesced Accesses
+\emph{for(i=0; i<height; i++) \{}
+  real accum = 0.0;
+
+  \emp{for(int j=0; j<width; j++) \{}
+    real tmpA = A'[j][i];
+    accum = tmpA*tmpA - accum;
+    B'[j][i] = accum;
+  \}
+\}
+B = transpose(B');
+\end{colorcode}
+\end{columns}
+\bigskip
+
+\begin{itemize}
+    \item \emph{Loop {\tt i} is parallel;}\smallskip
+    \item \emp{loop {\tt j} is sequential} because 
+            of the RAW cross-iteration dependencies on {\tt accum}.\bigskip
+    \item The transformed program performs about $3\times$ the number
+            of global-memory accesses than the original. \pause\smallskip
+    \item But it is about $6\times$ slower because of uncoalesced accesses.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Motivation: What Are Coalesced Accesses?} 
+
+\textbf{Coalesced access}: a (quarter) wave accesses in a
+SIMD instruction consecutive words in global-memory.\bigskip
+
+\includegraphics[height=20ex]{img/day2/CoalescedGPU}
+
+\end{frame}
+
+\subsection{Uncoalesced Matrix Transposition Kernel}
+
+\begin{frame}[fragile,t]
+  \frametitle{Uncoalesced Transposition Kernel} 
+
+\begin{itemize}
+    \item Semantically we chunk the matrix into {\tt T$\times$T} blocks;
+    \item Each block is processed by one workgroup, e.g., {\tt T=16}.
+\end{itemize}
+
+\begin{columns}
+\column{0.40\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+// Initial
+for(i=0; i<height; i++) \{    
+  for(j=0; j<width; j++) \{ 
+    B[j*height+i] =
+           A[i*width+j];
+  \}
+\}
+\end{colorcode}
+\column{0.58\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+// Blocked
+\emp{for(ii=0; ii<height; ii+=T) \{}
+  \emp{for(jj=0; jj<width; jj+=T) \{}
+    \emphh{for(i=ii; i<min(ii+T,height); i++) \{}
+      \emphh{for(j=jj; j<min(jj+T,width); j++) \{}
+        \red{B[j*height+i]} = A[i*width+j];
+\} \} \} \}
+\end{colorcode}
+\end{columns}
+
+\begin{itemize}
+\item Local workgroup: $T\times T$; 
+\item Global(1): $\lceil \texttt{width}/T \rceil * T$; Global 1: $\lceil \texttt{height}/T \rceil * T$.
+\end{itemize}
+\pause
+
+\begin{colorcode}[fontsize=\scriptsize]
+__kernel void naiveTransp( __global real* A, __global real* B
+                         , int height, int width ) \{
+    unsigned int i = get_global_id(1);
+    unsigned int j = get_global_id(0); 
+    if( (j >= width) || (i >= height) ) return;
+    \red{B[j*height + i]} = A[i*width + j];  \red{// uncoalesced access!}
+\}
+
+\end{colorcode}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Coalesced Transposition Kernel} 
+
+\begin{colorcode}[fontsize=\scriptsize]
+__kernel void coalsTransp coalsTransp( __global real* A, 
+        __global real* B, uint32_t height, uint32_t width ) \{
+  __local float tile[T][T];                          \red{// local memory}
+  int gidx = get_global_id(0); int gidy = get_global_id(1);
+  int lidx = get_local_id(0);  int lidy = get_local_id(1);
+
+  if( gidx < width && gidy < height )          \red{// cannot return here!}
+    lmem[lidy*T + lidx] = A[gidy*width + gidx]; \red{// copy to local mem!}
+  \red{barrier(CLK_LOCAL_MEM_FENCE); // all threads have to reach barrier!}
+
+  gidx = get_group_id(1)*T + lidx; gidy = get_group_id(0)*T + lidy;
+  if( gidx < height && gidy < width )
+      B[gidy*height + gidx] = lmem[lidx*T + lidy];
+\}
+\end{colorcode}
+
+Transposing a (blocked) matrix $\equiv$ moving each block to the transposed position $+$ transposing each block!\medskip
+
+\pause
+The trick to achieve coalesced access is to:
+\begin{itemize}
+    \item each thread {\tt (y,x)} in an workgroup reads element at index 
+          {\tt (y,x)} in the corresponding block (from global memory)
+    \item stores it in local memory
+    \item each thread write element \emph{\tt (x,y)} to the transposed matrix.
+\end{itemize}
+
+\end{frame}
+
+\subsection{Matrix Transposition with Only Coalesced Accesses}
+
+\begin{frame}[fragile,t]
+  \frametitle{Coalesced Transposition Kernel} 
+
+\begin{colorcode}[fontsize=\scriptsize]
+__kernel void coalsTransp coalsTransp( __global real* A, 
+        __global real* B, uint32_t height, uint32_t width ) \{
+  __local float tile[T][T];                          \red{// local memory}
+  int gidx = get_global_id(0); int gidy = get_global_id(1);
+  int lidx = get_local_id(0);  int lidy = get_local_id(1);
+
+  if( gidx < width && gidy < height )          \red{// cannot return here!}
+    lmem[lidy*T + lidx] = A[gidy*width + gidx]; \red{// copy to local mem!}
+  \red{barrier(CLK_LOCAL_MEM_FENCE); // all threads have to reach barrier!}
+
+  gidx = get_group_id(1)*T + lidx; gidy = get_group_id(0)*T + lidy;
+  if( gidx < height && gidy < width )
+      B[gidy*height + gidx] = lmem[lidx*T + lidy];
+\}
+\end{colorcode}
+
+Transposing a (blocked) matrix $\equiv$ moving each block to the transposed position $+$ transposing each block!\medskip
+
+\pause
+The trick to achieve coalesced access is to:
+\begin{itemize}
+    \item each thread {\tt (y,x)} in an workgroup reads element at index 
+          {\tt (y,x)} in the corresponding block (from global memory)
+    \item stores it in local memory
+    \item each thread write element \emph{\tt (x,y)} to the transposed matrix.
+\end{itemize}
+
+\end{frame}
+
+
+\subsection{Program Optimized By Transposition + Coding Exercise}
+
+\begin{frame}[fragile,t]
+  \frametitle{Exercise 1: Coalescing By Transposition} 
+
+\begin{columns}
+\column{0.42\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+real A[height][width];
+real B[height][width];
+// Non-Coalesced Access
+\emph{for(i=0; i<height; i++) \{}
+  real accum  = 0.0;
+
+  \emp{for(j=0; j<width; j++) \{}
+    real tmpA = A[i][j];
+    accum = tmpA*tmpA - accum;
+    B[i][j] = accum;
+\} \}\pause
+\end{colorcode}
+\column{0.55\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+A' = transpose(A);
+// Coalesced Accesses
+\emph{for(i=0; i<height; i++) \{}
+  real accum = 0.0;
+
+  \emp{for(int j=0; j<width; j++) \{}
+    real tmpA = A'[j][i];
+    accum = tmpA*tmpA - accum;
+    B'[j][i] = accum;
+\} \}
+B = transpose(B');
+\end{colorcode}
+\end{columns}
+\bigskip
+
+\begin{itemize}
+    \item Open File "Day2-Exercises/Transp/coalescing.c", function named "runGPUcoalsProgram".
+    \item Fill the correct sizes for the "coalsProgrm" kernel.
+    \item Open File "Day2-Exercises/Transp/kernels.cl" and implement kernel named "coalsProgrm".
+    \item Fix bugs until it validates! :-)
+    \item What is the speedup with respect to the naive program?
+    \item What fraction of the memcpy bandwidth is achieved? 
+\end{itemize}
+
+
+\end{frame}
+
+\subsection{Fully Fused Program + Coding Exercise}
+
+\begin{frame}[fragile,t]
+  \frametitle{Exercise 2: Fused Program With Coalesced Accesses}
+
+\begin{itemize}
+    \item Open File "Day2-Exercises/Transp/kernels.cl" and implement the missing pieces from kernel named "optimProgrm";\bigskip
+    \item The idea is to have coalesced accesses "fused" into the kernel by each 
+            thread processing {\tt CHUNK} elements at a time by:\smallskip
+    \begin{itemize}
+        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} elements from global to local memory
+                in coalesced fashion;\smallskip
+        \item each thread now processes {\tt CHUNK} elements from its row;\smallskip
+        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} elements from local to global memory
+                in coalesced fashion;\smallskip
+        \item repeat in a (sequential kernel) loop until all row's elements have been processed! 
+    \end{itemize}\bigskip
+    \item Fix bugs until it validates! :-)\bigskip
+    \item What is the speedup with respect to the transposition-optimized program?\bigskip
+    \item What fraction of the memcpy bandwidth is achieved? 
+\end{itemize}
+
+
+\end{frame}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Temporal Locality
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Optimizing Temporal Locality}
 
 \begin{frame}[fragile]
@@ -691,12 +962,12 @@ Thus, we cut the number of global-memory accesses by a {\tt T} factor.
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
 
 \begin{itemize}
-    \item Open File "Day2/MMMult/mmm.c", function named "runGPUverMMM".
-    \item Place there the correct sizes for the matrix multiplication kernels.
-    \item Open File "Day2/MMMult/mmm.cl" and implement kernel named "blockMMM".
+    \item Open File "Day2-Exercises/MMMult/mmm.c", function named "runGPUverMMM".
+    \item Place there the correct sizes for the matrix multiplication kernels. That would make the naive version work correctly.
+    \item Open File "Day2-Exercises/MMMult/mmm.cl" and implement kernel named "blockMMM".
     \item Fix bugs until it validates! :-)
 \end{itemize}
 
@@ -709,7 +980,7 @@ The parallel iteration space is block tiled, not the matrices:
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
 \begin{tiny}
 \emph{Copy {\tt A[ii:MIN(ii+T,M)][kk:MIN(kk+T,U)]} in {\tt A\_loc} of size {\tt[T][T]}}\\
 \emph{Copy {\tt B[kk:MIN(kk+T,U)][jj:MIN(jj+T,N)]} in {\tt B\_loc} of size {\tt[T][T]}}\\
@@ -745,7 +1016,7 @@ Local memory declared with: {\tt~~\_\_local float A\_loc[T][T];}
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
 \begin{tiny}
 \emph{Loops of index {\tt i} and {\tt j} form the local workgroup.}
 Interchange them innermost and distribute them:\\
@@ -792,7 +1063,7 @@ Local memory declared with: {\tt~~\_\_local float A\_loc[T][T];}
 \subsection{Register-Tiled Matrix Multiplication + Coding Exercise}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Matrix Multiplication by Register+Block Tiling}
+  \frametitle{Exercise 4: Matrix Multiplication by Register+Block Tiling}
 
 \begin{columns}
 \column{0.64\textwidth}
@@ -833,7 +1104,7 @@ Do not forget to perform array expansion on {\tt c}, which we will rename {\tt c
 
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 4: Register+Block Tiled Matrix Multiplication}
 
 \begin{colorcode}[fontsize=\tiny]
 unsigned int ii, i, jjj, jj, j, kk, k;
@@ -870,12 +1141,12 @@ unsigned int ii, i, jjj, jj, j, kk, k;
 
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 4: Register+Block Tiled Matrix Multiplication}
 
 \begin{itemize}
-    \item Open File "Day2/MMMult/mmm.c", function named "runGPUverMMM".
+    \item Open File "Day2-Exercises/MMMult/mmm.c", function named "runGPUverMMM".
     \item Fill the correct sizes for the "rgblkMMM" kernel.
-    \item Open File "Day2/MMMult/mmm.cl" and implement kernel named "rgblkMMM".
+    \item Open File "Day2-Exercises/MMMult/mmm.cl" and implement kernel named "rgblkMMM".
     \item Fix bugs until it validates! :-)
 \end{itemize}
 
@@ -888,31 +1159,18 @@ OpenCL equivalences: \pause
           {\tt jj = jjj + get\_local\_id(1) * T}\\
           {\tt j = jj + get\_local\_id(0)};
     \item Loops of index {\tt i} should be normalized {\tt[0..T-1]} and unrolled ({\tt \#pragma unroll});
-    \item Use {\tt \_\_local real Ash[RT][RT+1];} for bank conflicts.
+    \item Array {\tt cs} should be one dimensional: {\tt float cs[T];}
+    \item Use {\tt \_\_local real A\_loc[T][T+1];} for bank conflicts.
 \end{itemize}
 
 \end{frame}
-
-\section{Optimizing Spatial Locality (Coalesced Memory)}
-
-\begin{frame}[fragile]
-	\tableofcontents[currentsection]
-\end{frame}
-
-\subsection{Matrix Transposition with Only Coalesced Accesses}
-
-\subsection{Naive Program}
-
-\subsection{Program Optimized By Transposition + Coding Exercise}
-
-\subsection{Fully Fused Program + Coding Exercise}
 
 
 \section{Recognizing Reduction, Segmented Scan}
 \begin{frame}[fragile,t]
   \frametitle{Reduction is Typically Easy To Recognize} 
 
-If all the statements in which a scalar variable {x} appears
+If all the statements in which a scalar variable {\tt x} appears
 are of the form {\tt x $\oplus$ = $exp$}, where {\tt x} does 
 not appear in $\exp$ and $\oplus$ is associative 
 then the cross-iteration RAWs on {\tt x} can be resolved by:

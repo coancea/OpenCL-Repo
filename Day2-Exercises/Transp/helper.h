@@ -142,7 +142,7 @@ void initProgramKernels() {
         clSetKernelArg(kers.coalsProgrm, 3, sizeof(cl_int), &buffs.width);
     }
 
-    { // coalesced
+    { // optimized (fused)
         kers.optimProgrm = clCreateKernel(ctrl.prog, "optimProgrm", &error);
         OPENCL_SUCCEED(error);
         clSetKernelArg(kers.optimProgrm, 0, sizeof(cl_mem), &buffs.dA);
