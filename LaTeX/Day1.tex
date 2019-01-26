@@ -246,11 +246,14 @@ Addressed with caches (not scalable) and \textit{latency hiding}.
   \item Since we want to teach you \textit{actual} OpenCL, we can't do
     that, but we will use a small library of abbreviations and
     helpers: \texttt{clutils.h}
+  \item OpenCL comprises ordinary code running on the \textit{host}
+    (CPU), which calls API functions to direct the \textit{device}
+    (e.g. GPU).
   \end{itemize}
 
   \bigskip
 
-  \hfill\includegraphics[width=0.25\textwidth]{img/opencl-logo.png}
+  \hfill\includegraphics[width=0.2\textwidth]{img/opencl-logo.png}
 
   \url{https://www.khronos.org/registry/OpenCL/sdk/1.0/docs/man/xhtml/}
 
@@ -429,7 +432,355 @@ for (unsigned int j = 0; j < num_devices; j++) {
 
   \begin{enumerate}
   \item Ensure the AMD OpenCL SDK is installed.
+  \item Do lots of things...
   \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Obtaining a \texttt{cl\_command\_queue} (clutils.h)}
+
+Assuming variables \texttt{platform\_index} and \texttt{device\_index}.
+
+\begin{lstlisting}
+cl_uint num_platforms;
+OPENCL_SUCCEED(
+  clGetPlatformIDs(0, NULL, &num_platforms));
+cl_platform_id *all_platforms =
+  (cl_platform_id*)
+  calloc(num_platforms, sizeof(cl_platform_id));
+OPENCL_SUCCEED(
+  clGetPlatformIDs(num_platforms,
+                   all_platforms,
+                   NULL));
+
+assert(platform_index < num_platforms);
+cl_platform_id platform =
+  all_platforms[platform_index];
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+\begin{lstlisting}
+cl_uint num_devices;
+OPENCL_SUCCEED(
+  clGetDeviceIDs(platform,
+                 CL_DEVICE_TYPE_ALL,
+                 0, NULL,
+                 &num_devices));
+cl_device_id *platform_devices =
+  (cl_device_id*)
+  calloc(num_devices, sizeof(cl_device_id));
+OPENCL_SUCCEED(
+  clGetDeviceIDs(platform,
+                 CL_DEVICE_TYPE_ALL,
+                 num_devices,
+                 platform_devices,
+                 NULL));
+
+assert(device_index < num_devices);
+cl_device_id device = platform_devices[device_index];
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+cl_context clCreateContext
+  (cl_context_properties *properties,
+   cl_uint num_devices,
+   const cl_device_id *devices,
+   void *pfn_notify (...),
+   void *user_data,
+   cl_int *errcode_ret)
+\end{lstlisting}
+
+\begin{lstlisting}
+cl_context_properties properties[] = {
+  CL_CONTEXT_PLATFORM,
+  (cl_context_properties)platform,
+  0
+};
+
+cl_int error;
+cl_context ctx =
+  clCreateContext(properties, 1, &device,
+                  NULL, NULL, &error);
+OPENCL_SUCCEED(error);
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile,fragile]
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+cl_command_queue clCreateCommandQueue
+  (cl_context context,
+   cl_device_id device,
+   cl_command_queue_properties properties,
+   cl_int *errcode_ret)
+\end{lstlisting}
+
+\begin{lstlisting}
+cl_command_queue queue =
+  clCreateCommandQueue(*ctx, *device, 0, &error);
+OPENCL_SUCCEED(error);
+\end{lstlisting}
+
+  Using \texttt{clutils.h}, all of the above can be replaced with:
+
+\begin{lstlisting}
+cl_context ctx;
+cl_command_queue queue;
+cl_device_id device;
+opencl_init_command_queue_default
+  (&device, &ctx, &queue);
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Rot-13 in OpenCL (Day1/rot13.c)}
+
+Rot-13 is a cutting edge encryption algorithm.  In C, it is:
+
+\begin{lstlisting}
+void rot13(char *out, char *in, int n) {
+  for (int i = 0; i < n; i++) {
+    if (i < n) {
+      if (in[i] >= 'a' && in[i] <= 'z') {
+        out[i] = (in[i] - 'a' + 13) % 26 + 'a';
+      } else {
+        out[i] = in[i];
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+Here restricted to operate on lowercase ASCII only to ensure readable
+output.
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Loading OpenCL programs}
+
+  We obtain an OpenCL \textit{program} by passing its source (written
+  in OpenCL C) to \texttt{clBuildProgram()}.  Lots of boilerplate
+  again; let's just use \texttt{clutils.h}:
+
+\begin{lstlisting}
+cl_program program = opencl_build_program(ctx, device, "kernels/rot13.cl", "");
+\end{lstlisting}
+
+  OpenCL C is a cut-down dialect of C with many restrictions:
+
+  \begin{itemize}
+  \item No function pointers.
+  \item No recursion.
+  \item Limited standard library.
+  \item No memory allocation.
+  \item No printing to the screen.
+  \item \textit{Etc...}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Kernel functions (Day1/kernels/rot13.cl)}
+
+  An OpenCL C program contains kernel functions that serve as
+  entry points:
+
+\begin{lstlisting}
+// Rot-13 for lowercase ASCII.
+kernel void rot13(global char *out,
+                  global char *in,
+                  int n) {
+  int gtid = get_global_id(0);
+  if (gtid < n) {
+    if (in[gtid] >= 'a' &&
+        in[gtid] <= 'z') {
+      out[gtid] = (in[gtid] - 'a' + 13)
+                  % 26 + 'a';
+    } else {
+      out[gtid] = in[gtid];
+    }
+  }
+}
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Accesing kernels (Day1/rot13.c)}
+
+  To launch a kernel on the GPU from the host, we first use
+  \texttt{clCreateKernel()} with the \texttt{cl\_program} object we
+  got back:
+
+\begin{lstlisting}
+cl_kernel rot13_k = clCreateKernel(program, "rot13", &error);
+OPENCL_SUCCEED(error);
+\end{lstlisting}
+
+  \begin{itemize}
+  \item Now we can ask the GPU to run the kernel.
+  \item Except that GPUs have their own separate memory, so we have no
+    data for the kernel to work on!
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,fragile]
+  \frametitle{Allocating GPU memory}
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+cl_mem clCreateBuffer(cl_context context,
+                      cl_mem_flags flags,
+                      size_t size,
+                      void *host_ptr,
+                      cl_int *errcode_ret)
+\end{lstlisting}
+
+\begin{lstlisting}
+char *string = "Hello, World!\n";
+cl_int n = strlen(string);
+
+cl_mem input =
+   clCreateBuffer(ctx,
+                  CL_MEM_READ_ONLY
+                  | CL_MEM_COPY_HOST_PTR,
+                  n, string, &error);
+
+cl_mem output =
+  clCreateBuffer(ctx, CL_MEM_WRITE_ONLY,
+                 n, NULL, &error);
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile,fragile]
+  \frametitle{Passing arguments to the kernel}
+
+  Remember that \texttt{rot13\_k} object?  We finally get to use it.
+
+\begin{lstlisting}
+clSetKernelArg
+  (rot13_k, 0, sizeof(cl_mem), &output);
+clSetKernelArg
+  (rot13_k, 1, sizeof(cl_mem), &input);
+clSetKernelArg
+  (rot13_k, 2, sizeof(cl_int), &n);
+\end{lstlisting}
+
+Reminder on \texttt{Day1/kernels/rot13.cl}:
+
+\begin{lstlisting}
+kernel void rot13(global char *out,
+                  global char *in,
+                  int n) {
+  ...
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Launching a kernel}
+
+  When launching a kernel, we must specify the layout of the grid:
+
+  \begin{itemize}
+  \item The number of dimensions (1, 2, or 3).
+  \item The size of each workgroup in each dimension.
+  \item The total number of threads in each dimension (which must be
+    divisible by the workgroup size in that dimension).
+  \end{itemize}
+
+  For our rot-13, we want a 1D grid with one thread per input, rounded
+  up to the workgroup size.
+
+\begin{lstlisting}
+size_t local_work_size[1] = { 256 };
+size_t global_work_size[1] = {
+  div_rounding_up(n, local_work_size[0])
+  * local_work_size[0]
+};
+\end{lstlisting}
+
+Workgroup size is a tunable parameter, but we'll always pick 256 for
+now.
+
+\end{frame}
+
+\begin{frame}[fragile,fragile]
+  \frametitle{\texttt{clEnqueueNDRangeKernel()}}
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+ cl_int clEnqueueNDRangeKernel
+   (cl_command_queue command_queue,
+    cl_kernel kernel,
+    cl_uint work_dim,
+    const size_t *global_work_offset,
+    const size_t *global_work_size,
+    const size_t *local_work_size,
+    cl_uint num_events_in_wait_list,
+    const cl_event *event_wait_list,
+    cl_event *event)
+\end{lstlisting}
+
+\begin{lstlisting}
+clEnqueueNDRangeKernel(queue, rot13_k,
+                       1,
+                       NULL,
+                       global_work_size,
+                       local_work_size,
+                       0, NULL, NULL);
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{More on command queues}
+
+  \begin{itemize}
+  \item Enqueuing a command is \textit{asynchronous}.  It might start
+    executing immediately, soon, or not at all.
+  \item Use \texttt{clFinish()} to ensure that all operations have
+    finished:
+  \end{itemize}
+
+\begin{lstlisting}
+OPENCL_SUCCEED(clFinish(queue));
+\end{lstlisting}
+
+  This is also where execution errors are typically reported.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Reading results back from the GPU}
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+cl_int clEnqueueReadBuffer
+  (cl_command_queue command_queue,
+   cl_mem buffer,
+   cl_bool blocking_read,
+   size_t offset, size_t cb, void *ptr,
+   cl_uint num_events_in_wait_list,
+   const cl_event *event_wait_list,
+   cl_event *event)
+\end{lstlisting}
+
+\begin{lstlisting}
+char *output_string = malloc(n + 1);
+output_string[n] = '\0'; // Ensure 0-termination.
+clEnqueueReadBuffer(queue, output, CL_TRUE,
+                    0, n,
+                    output_string,
+                    0, NULL, NULL);
+
+printf("Result: %s\n", output_string);
+\end{lstlisting}
 
 \end{frame}
 
@@ -589,6 +940,103 @@ clGetEventProfilingInfo
 	\tableofcontents[currentsection]
 \end{frame}
 
+\begin{frame}
+  \frametitle{Profiling rot-13 with wall clock and events}
+
+  \begin{itemize}
+  \item \texttt{Day1-exercises/rot13-profile-simple.c}
+  \item \texttt{Day1-exercises/rot13-profile-events.c}
+  \end{itemize}
+
+  Try profiling both one and multiple kernel launches.  What do you
+  observe?  What if you call \texttt{clFinish()} after every kernel
+  invocation?  What if you also count the cost of copying from the CPU
+  to the GPU?
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Reversing a string in parallel}
+
+  Write an OpenCL for reversing a string.  Base it heavily on the
+  Rot-13 program.  Create your own Visual Studio project for it as
+  well.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Load balancing (\texttt{Day1-exercises/fibfact.c})}
+
+  Finish the program, which is supposed to do the equivalent of:
+
+\begin{lstlisting}
+void f (int k, float *out, int *ns, int *op)
+for (int i = 0; i < k; i++) {
+  int n = ns[i];
+  int x;
+  if (op[i] == 1) {
+    x = fib(n);
+  } else {
+    x = fact(n);
+  }
+  out[i] = x;
+}
+\end{lstlisting}
+
+  \begin{itemize}
+  \item Where \texttt{fact()} and \texttt{fib()} are the usual
+    factorial and Fibonacci functions.
+  \item How fast does it run for various contents of \texttt{ns} and
+    \texttt{ops}?  Can you make it faster by preprocessing these
+    arrays?
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Implementing Game of Life (\texttt{Day1-exercises/life-arrays.c})}
+
+  Conway's Game of Life is a simple 2D cellular automaton
+  (``stencil'') that is embarassingly parallel.  Each cell is updated
+  based on the value of its neighbours.
+
+  \begin{center}
+    \includegraphics[width=4cm]{img/stencil.png}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Using image objects for Game of Life (\texttt{Day1-exercises/life-images.c})}
+
+  \begin{itemize}
+  \item GPUs have special hardware for textures, and this can be used
+    whenever we need 2D arrays with spatial locality (like in Game of
+    Life).
+
+  \item Instead of \texttt{clCreateBuffer()}, use
+    \texttt{clCreateImage()}, and in the kernel use the
+    \texttt{image2d\_t} type.
+
+  \item Implement this as a 2D kernel in
+    \texttt{Day1-exercises/life-images.c}.
+
+  \item Main challenge: understand the OpenCL documentation and figure
+    out how to represent our information in a colour channel.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Matrix multiplication (\texttt{Day1-exercises/life-images.c})}
+
+  \begin{itemize}
+  \item Implement matrix multiplication as a 2D kernel with one thread
+    per element in the output matrix.
+  \item \textbf{Spoiler alert:} you will find that it is slow.  Why?
+  \end{itemize}
+
+  Cosmin will eventually tell you how to make it less slow.
+
+\end{frame}
 
 \end{document}
 

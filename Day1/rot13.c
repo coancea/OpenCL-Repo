@@ -24,24 +24,12 @@ int main() {
   cl_int n = strlen(string);
 
   // Note: CL_MEM_READ_ONLY is only a restriction on kernels, not the host.
-  cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY |  CL_MEM_COPY_HOST_PTR,
+  cl_mem input = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                 n, string, &error);
   OPENCL_SUCCEED(error);
 
   cl_mem output = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, n, NULL, &error);
   OPENCL_SUCCEED(error);
-
-  // Write the input to the kernel, asynchronously.  Alternatively, we
-  // could use the CL_MEM_COPY_HOST_PTR flag for clCreateBuffer().
-  clEnqueueWriteBuffer(queue, input,
-                       CL_FALSE, // Non-blocking write
-                       0, // Offset in 'input'.
-                       n, // Number of bytes to copy.
-                       string, // Where to copy from.
-                       0, NULL, NULL);
-
-  // Wait for the write to succeed.
-  OPENCL_SUCCEED(clFinish(queue));
 
   clSetKernelArg(rot13_k, 0, sizeof(cl_mem), &output);
   clSetKernelArg(rot13_k, 1, sizeof(cl_mem), &input);
