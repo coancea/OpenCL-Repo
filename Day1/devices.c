@@ -32,12 +32,15 @@ int main() {
 
     free(name);
 
-    // Now let us print the names of all the devices, first we count how many of them exist.
+    // Now let us print the names of all the devices.  First we count
+    // how many of them exist.
     cl_uint num_devices;
     OPENCL_SUCCEED(clGetDeviceIDs(all_platforms[i], CL_DEVICE_TYPE_ALL, 0, NULL, &num_devices));
 
     // Then we make room for them.
     cl_device_id *platform_devices = calloc(num_devices, sizeof(cl_device_id));
+
+    // Then we fetch them.
     OPENCL_SUCCEED(clGetDeviceIDs(all_platforms[i], CL_DEVICE_TYPE_ALL,
                                   num_devices, platform_devices, NULL));
 
