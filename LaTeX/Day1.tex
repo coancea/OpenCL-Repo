@@ -40,7 +40,6 @@
 	\tableofcontents[currentsection]
 \end{frame}
 
-
 \begin{frame}
   \frametitle{The first computers were not this}
 
@@ -212,7 +211,7 @@ Addressed with caches (not scalable) and \textit{latency hiding}.
 \end{frame}
 
 
-\section{The GPU architecture}
+\section{The GPU Architecture}
 
 \begin{frame}
 	\tableofcontents[currentsection]
@@ -225,10 +224,29 @@ Addressed with caches (not scalable) and \textit{latency hiding}.
 
 {
 \setbeamercolor{background canvas}{bg=}
-\includepdf[pages=4-45]{img/Introduction-to-GPUs.pdf}
+\includepdf[pages=4-38]{img/Introduction-to-GPUs.pdf}
 }
 
-\section{The OpenCL programming model}
+\begin{frame}
+  \frametitle{The GPU we will be using: Radeon HD
+    7800\footnote{\url{https://developer.amd.com/wordpress/media/2012/12/AMD_Southern_Islands_Instruction_Set_Architecture.pdf}}}
+
+  \includegraphics[width=\textwidth]{img/pitcairn.png}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zooming in on the Compute Units}
+
+  \includegraphics[width=\textwidth]{img/pitcairn-cus.png}
+
+  \begin{itemize}
+  \item Each vector-ALU executes a \textit{wavefront} of 64 work-items
+    over four clock cycles.
+  \item Many wavefronts in flight at once to hide latency.
+  \end{itemize}
+
+\end{frame}
+\section{The OpenCL Programming Model}
 
 \begin{frame}
 	\tableofcontents[currentsection]
@@ -735,16 +753,16 @@ now.
   \frametitle{\texttt{clEnqueueNDRangeKernel()}}
 
 \begin{lstlisting}[backgroundcolor=\color{lightgray}]
- cl_int clEnqueueNDRangeKernel
-   (cl_command_queue command_queue,
-    cl_kernel kernel,
-    cl_uint work_dim,
-    const size_t *global_work_offset,
-    const size_t *global_work_size,
-    const size_t *local_work_size,
-    cl_uint num_events_in_wait_list,
-    const cl_event *event_wait_list,
-    cl_event *event)
+cl_int clEnqueueNDRangeKernel
+  (cl_command_queue command_queue,
+   cl_kernel kernel,
+   cl_uint work_dim,
+   const size_t *global_work_offset,
+   const size_t *global_work_size,
+   const size_t *local_work_size,
+   cl_uint num_events_in_wait_list,
+   const cl_event *event_wait_list,
+   cl_event *event)
 \end{lstlisting}
 
 \begin{lstlisting}
@@ -950,6 +968,98 @@ clGetEventProfilingInfo
 
   However, neither of these approaches will tell us \textit{why}
   something is slow...
+\end{frame}
+
+\section{Coalesced Memory Accesses}
+
+\begin{frame}
+	\tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Summing the rows of a matrix}
+
+  Consider summing the rows/columns of a $10000\times{}10000$
+  row-major matrix on CPU and GPU:
+
+  \includegraphics[width=\textwidth]{img/rowcolumnarrays.jpg}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Performance}
+
+\begin{lstlisting}
+for (int row = 0; row < n; row++) {
+  cl_int sum = 0;
+  for (int col = 0; col < n; col++) {
+    sum += matrix[row*n+col];
+  }
+  sums[row] = sum;
+}
+\end{lstlisting}
+
+On the GPU, we assign one iteration of the outer loop to each thread.
+
+\bigskip
+
+  \begin{tabular}{lr}
+    Summing rows on CPU & $22025\mu{}s$ \\
+    Summing columns on CPU & $741225\mu{}s$ \\
+    Summing rows on GPU & $60461\mu{}s$ \\
+    Summing columns on GPU & $6169\mu{}s$
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Why does this go so badly?}
+
+  The reason is our memory access pattern -- specifically, our loads
+  are not \textit{coalesced}.
+
+  \begin{block}{Memory Coalescing}
+    All threads within each consecutive 16-thread gang should
+    simultaneously access consecutive elements in memory to maximise
+    memory bus usage.
+  \end{block}
+
+  \begin{itemize}
+  \item If neighboring threads access widely distant memory in the same
+    clock cycle, the loads have to be \textit{sequentialised}, instead
+    of all fulfilled using one (wide) memory bus operation.
+  \item The HD 7800 has a memory bus width of 256 bits, so only using
+    32 bits per operation exploits an eight of the bandwidth.
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{The accesses specifically}
+
+\begin{table}[H]
+\caption{Current accesses - this is worst case behaviour!}
+  \begin{tabular}{l|llll}
+    \textbf{Iteration} & \textbf{Thread $0$} & \textbf{Thread $1$} & \textbf{Thread $2$} & ... \\\hline
+    0 & $\texttt{matrix}[0]$ & $\texttt{matrix}[n]$ & $\texttt{matrix}[2n]$ & ... \\
+    1 & $\texttt{matrix}[1]$ & $\texttt{matrix}[n+1]$ & $\texttt{matrix}[2n+1]$ & ... \\
+    2 & $\texttt{matrix}[2]$ & $\texttt{matrix}[n+2]$ & $\texttt{matrix}[2n+2]$ & ... \\
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+\caption{These are the accesses we want}
+  \begin{tabular}{l|llll}
+    \textbf{Iteration} & \textbf{Thread $0$} & \textbf{Thread $1$} & \textbf{Thread $2$} & ... \\\hline
+    0 & $\texttt{matrix}[0]$ & $\texttt{matrix}[1]$ & $\texttt{matrix}[2]$ & ... \\
+    1 & $\texttt{matrix}[n]$ & $\texttt{matrix}[n+1]$ & $\texttt{matrix}[n+2]$ & ... \\
+    2 & $\texttt{matrix}[nc]$ & $\texttt{matrix}[2n+1]$ & $\texttt{matrix}[2n+2]$ & ... \\
+  \end{tabular}
+\end{table}
+
+\textit{This is the exact opposite of what we are usually taught for
+  CPUs!}
+
 \end{frame}
 
 \section{Programming Exercises}
