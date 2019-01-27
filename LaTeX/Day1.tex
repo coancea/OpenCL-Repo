@@ -145,7 +145,7 @@
   \item \textit{Power complexity} $P_{dynamic} \sim Freq^3$,
     preventing us from increasing processor frequency.
   \item \textit{Memory wall}, ever-increasing performance gap between
-    processor \& memory (which means that \textit{memory} becomes
+    processor and memory (which means that \textit{memory} becomes
     bottleneck, not processor speed).
   \end {itemize}
 \end{frame}
@@ -189,6 +189,24 @@ Addressed with caches (not scalable) and \textit{latency hiding}.
 
   Ultimately, GPUs do \textit{throughput processing}, and operations
   have (relatively) high latency.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{CPUs compared to CPUs}
+
+  \includegraphics[width=\textwidth]{img/cpu-gpu-architecture.pdf}
+
+  \begin{itemize}
+  \item GPUs have \textit{thousands} of simple cores and taking full
+    advantage of their compute power requires \textit{tens of
+      thousands} of threads.
+  \item GPU threads are very \textit{restricted} in what they can do:
+    no stack, no allocation, limited control flow, etc.
+  \item Potential \textit{very high performance} and \textit{lower
+      power usage} compared to CPUs, but programming them is
+    \textit{hard}.
+  \end{itemize}
 
 \end{frame}
 
@@ -252,6 +270,33 @@ Addressed with caches (not scalable) and \textit{latency hiding}.
 	\tableofcontents[currentsection]
 \end{frame}
 
+\begin{frame}[fragile,t]
+\frametitle{GPU programming}
+
+\begin{center}
+\includegraphics[height=43ex]{img/MemCpy1.pdf}
+\end  {center}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+\frametitle{GPU programming}
+
+\begin{center}
+\includegraphics[height=43ex]{img/MemCpy2.pdf}
+\end  {center}
+
+\end{frame}
+
+
+\begin{frame}[fragile,t]
+\frametitle{GPU programming}
+
+\begin{center}
+\includegraphics[height=43ex]{img/MemCpy3.pdf}
+\end  {center}
+
+\end{frame}
 
 \begin{frame}
   \frametitle{OpenCL for this course}
@@ -826,7 +871,34 @@ printf("Result: %s\n", output_string);
 	\tableofcontents[currentsection]
 \end{frame}
 
-\begin{frame}[fragile,fragile]
+\begin{frame}[fragile]
+  \frametitle{Debugging with \texttt{oclgrind}}
+
+  \begin{itemize}
+  \item \url{https://github.com/jrprice/Oclgrind}
+  \item Makes itself available as an OpenCL platform that runs your
+    kernels in an error-checking interpreter.
+  \item A lot like \texttt{valgrind}.
+  \item Fairly slow, so use it on reduced workloads.
+  \end{itemize}
+
+\begin{lstlisting}[basicstyle=\small,breaklines=true]
+$ oclgrind ./rot13
+Using platform: Oclgrind
+Using device: Oclgrind Simulator
+
+Invalid read of size 1 at global memory address 0x100000000000e
+  Kernel: rot13
+  Entity: Global(14,0,0) Local(14,0,0) Group(0,0,0)
+    %1 = load i8, i8 addrspace(1)* %arrayidx, align 1, !dbg !20
+  At line 5 of input.cl:
+    if (in[gtid] >= 'a' && in[gtid] <= 'z') {
+...
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
   \frametitle{Profiling with Wall Clock Time}
 
 Just like how you profile anything else.
