@@ -1,11 +1,11 @@
-const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_FILTER_NEAREST;
+const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_FILTER_NEAREST | CLK_ADDRESS_NONE;
 
 int get(int n, int m, read_only image2d_t in, int i, int j) {
   if (i >= n || i < 0 || j >= m || j < 0) {
     return 0;
   } else {
     uint4 v = read_imageui(in, sampler, (int2)(i,j));
-    return v.x;
+    return v.s0;
   }
 }
 
