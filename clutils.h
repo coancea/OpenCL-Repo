@@ -87,7 +87,7 @@ static int64_t get_wall_time(void) {
   LARGE_INTEGER time,freq;
   assert(QueryPerformanceFrequency(&freq));
   assert(QueryPerformanceCounter(&time));
-  return ((double)time.QuadPart / freq.QuadPart) * 1000000;
+  return (int64_t)(((double)time.QuadPart / freq.QuadPart) * 1000000);
 }
 
 #else

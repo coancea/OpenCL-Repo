@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 
   int runs = 10;
 
-  cl_event kernel_events[runs];
+  cl_event *kernel_events = calloc(runs, sizeof(cl_event));
 
   for (int i = 0; i < runs; i++) {
     clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size,
@@ -120,4 +120,6 @@ int main(int argc, char** argv) {
 
       OPENCL_SUCCEED(clReleaseEvent(kernel_events[i]));
   }
+
+  free(kernel_events);
 }
