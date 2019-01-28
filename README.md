@@ -1,6 +1,10 @@
 # OpenCL-Repo
 Various code examples in OpenCL
 
+## Teachers: 
+* Troels Henriksen  athas@sigkill.dk
+* Cosmin Oancea     cosmin.oancea@diku.dk
+
 ## Tentative schedule
 
 ### DAY 1 ([slides](Day1.pdf))
