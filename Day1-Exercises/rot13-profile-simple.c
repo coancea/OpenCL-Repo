@@ -87,31 +87,5 @@ int main(int argc, char** argv) {
   size_t local_work_size[1] = { 256 };
   size_t global_work_size[1] = { div_rounding_up(n, local_work_size[0]) * local_work_size[0] };
 
-  bef = get_wall_time();
-  for (int i = 0; i < runs; i++) {
-    clEnqueueNDRangeKernel(queue, rot13_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL);
-  }
-
-  // Wait for the kernel(s) to stop.
-  OPENCL_SUCCEED(clFinish(queue));
-
-  aft = get_wall_time();
-  int64_t opencl_us = aft-bef;
-
-  printf("%d kernels of total runtime %dμs (average %dμs)\n",
-         runs, (int)opencl_us, (int)(opencl_us/runs));
-
-  // Read the result into 'string' and compare with the sequential
-  // result in 'string_out'.
-  clEnqueueReadBuffer(queue, output,
-                      CL_TRUE,
-                      0, n,
-                      string,
-                      0, NULL, NULL);
-
-  printf("Speedup: %f\n", (float)sequential_us/opencl_us);
-
-  if (strcmp(string, string_out) != 0) {
-    printf("Invalid result.\n");
-  }
+  // TODO: run and profile
 }
