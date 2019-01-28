@@ -72,10 +72,10 @@ __kernel void rgblkMMM  ( __global real* A
     __local real Ash[RT][RT+1];
     real cs[RT]; 
 
-    uint32_t ii  = get_group_id(1) * RT;     
-    uint32_t jjj = get_group_id(0) * RT * RT;
-    uint32_t jj  = jjj + get_local_id(1) * RT;
-    uint32_t j   = jj  + get_local_id(0); 
+    uint32_t ii   = get_group_id(1) * RT;
+	uint32_t j    = get_global_id(0);
+	uint32_t locx = get_local_id(0) % RT;
+	uint32_t locy = get_local_id(0) / RT;
 
     #pragma unroll
     for(int i=0; i<RT; i++)
@@ -83,10 +83,10 @@ __kernel void rgblkMMM  ( __global real* A
 
     for(int kk = 0; kk < widthA; kk += RT) {
         real tmp = 0.0;
-        if ((ii+get_local_id(1) < heightA) && (kk+get_local_id(0) < widthA)) {
-            tmp = A[(ii+get_local_id(1))*widthA + kk+get_local_id(0)];
+        if ((ii+locy < heightA) && (kk+locx < widthA)) {
+            tmp = A[(ii+locy)*widthA + kk+locx];
         }
-        Ash[get_local_id(1)][get_local_id(0)] = tmp;
+        Ash[locy][locx] = tmp;
         barrier(CLK_LOCAL_MEM_FENCE);
 
         for(int k = 0; k < RT; k++) {

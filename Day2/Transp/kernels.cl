@@ -123,13 +123,13 @@ __kernel void coalsProgrm( __global real* A
     }
 }
 
-__kernel void optimProgrm0( __global real* A
+__kernel void optimProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width
 ) {
     // Assumes that GROUP-SIZE is TILE*TILE and GROUP-SIZE is a multiple of CHUNK
-    volatile __local real lmem[TILE*TILE][CHUNK+1]; 
+    volatile __local real lmem[TILE*TILE][CHUNK+1];
     uint32_t gid        = get_global_id(0);
     uint32_t lid        = get_local_id(0);
     uint32_t chunk_lane = lid % CHUNK;
@@ -182,7 +182,7 @@ __kernel void optimProgrm0( __global real* A
 }
 
 #define CWAVE 16
-__kernel void optimProgrm( __global real* A
+__kernel void optimProgrm1( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width

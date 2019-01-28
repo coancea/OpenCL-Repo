@@ -10,11 +10,11 @@ typedef float real;
 
 
 #define HEIGHT_A 1024 //537
-#define WIDTH_A  256  //422
-#define WIDTH_B  2048 //732
+#define WIDTH_A  1024//256  //422
+#define WIDTH_B  1024//2048 //732
 
 #define RUNS_CPU 1
-#define RUNS_GPU 50
+#define RUNS_GPU 100
 
 /*******************************/
 /***        Helpers          ***/
@@ -79,10 +79,10 @@ void runGPUverMMM(Version kind, real* hC, real* hdC) {
         globalWorkSize[1] = mkGlobalDim(buffs.heightA, TILE );
     } else { // treat the case for the register + block tiling.
         kernel = kers.rgblkMMM;
-        localWorkSize [0] = RT;
-        localWorkSize [1] = RT;
-        globalWorkSize[0] = mkGlobalDim(buffs.widthB, RT*RT ); //( (buffs.widthB + RT*RT - 1) / (RT*RT) ) * RT;
-        globalWorkSize[1] = (buffs.heightA + RT - 1) / RT;     //mkGlobalDim(buffs.heightA, RT );
+        localWorkSize [0] = RT * RT;
+        localWorkSize [1] = 1;
+        globalWorkSize[0] = mkGlobalDim(buffs.widthB, RT*RT );
+        globalWorkSize[1] = (buffs.heightA + RT - 1) / RT;
     }
 
     { // run kernel
