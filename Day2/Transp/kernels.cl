@@ -5,6 +5,7 @@ typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
 
+inline
 real arithmFun(real accum, real a) {
     return (a*a - accum);  // sqrt(accum) + a*a;
 }
