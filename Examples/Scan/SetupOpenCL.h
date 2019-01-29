@@ -36,7 +36,7 @@ int32_t getNumElemPerThread() {
     return (int32_t) num;
 }
 
-inline size_t getNumBlocks(const uint32_t N) {
+size_t getNumBlocks(const uint32_t N) {
     const size_t numelems_group = WORKGROUP_SIZE * getNumElemPerThread();
     return (N + numelems_group - 1) / numelems_group;
 }

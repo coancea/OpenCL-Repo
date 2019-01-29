@@ -1,9 +1,13 @@
 # OpenCL-Repo
 Various code examples in OpenCL
 
+## Teachers: 
+* Troels Henriksen  athas@sigkill.dk
+* Cosmin Oancea     cosmin.oancea@diku.dk
+
 ## Tentative schedule
 
-### DAY 1
+### DAY 1 ([slides](Day1.pdf))
 
 I. Lecture 9:00 - 11:00:
 
@@ -115,20 +119,3 @@ Practical considerations: here we discuss computational kernels of
 interest to BkMedical (proposed by Franck)
 By discuss, I mean fill in the blank exercises through which we guide
 the audience to develop and efficient solution.
-
-## Stuff for Troels to do
-
-* GPU architecture/motivation
-* GPU-specific details (AMD)
-* Hello-world kernels
-* Command queue/events (streaming?)
-* 2D stencil, with texture memory
-* Profiling and debugging
-* Naive matrix-matrix multiplication
-* Reduction
-
-### Exercise ideas
-
-* MSSP (map/reduce fusion)
-* Parallel reduction of matrix rows
-* Sparse-Matrix Vector multiplication

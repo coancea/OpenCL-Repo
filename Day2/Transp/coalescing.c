@@ -4,10 +4,10 @@
 typedef float real;
 #define REAL_STR "float"
 
-#define TILE   16
-#define CHUNK  8   // CHUNK must divide TILE^2
-#define HEIGHT 67537
-#define WIDTH  64
+#define TILE   8
+#define CHUNK  16   // CHUNK must divide TILE^2
+#define HEIGHT 150000//67537
+#define WIDTH  63 // it does NOT like powers of two
 
 #define RUNS_CPU 1
 #define RUNS_GPU 175
