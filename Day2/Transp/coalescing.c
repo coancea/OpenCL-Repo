@@ -4,8 +4,9 @@
 typedef float real;
 #define REAL_STR "float"
 
-#define TILE   8
+#define TILE   16
 #define CHUNK  16   // CHUNK must divide TILE^2
+#define PRG_WGSIZE (CHUNK*8)
 #define HEIGHT 150000//67537
 #define WIDTH  63 // it does NOT like powers of two
 
@@ -185,8 +186,8 @@ void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
 }
 
 void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
-    size_t localWorkSize  = TILE*TILE;
-    size_t globalWorkSize = mkGlobalDim(buffs.height, TILE*TILE );
+    size_t localWorkSize  = PRG_WGSIZE;
+    size_t globalWorkSize = mkGlobalDim(buffs.height, PRG_WGSIZE );
     cl_kernel kernel = (vers == NAIVE_PROGRM) ? kers.naiveProgrm : kers.optimProgrm;
     { // run kernel
         cl_int ciErr1 = CL_SUCCESS;
@@ -230,8 +231,8 @@ void runGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
 }
 
 void runGPUcoalsProgram(real* hB, real* hdB) {
-    size_t localWorkSize  = TILE*TILE;
-    size_t globalWorkSize = mkGlobalDim(buffs.height, TILE*TILE );
+    size_t localWorkSize  = PRG_WGSIZE;
+    size_t globalWorkSize = mkGlobalDim(buffs.height, PRG_WGSIZE );
     size_t localTransp[2] = {TILE, TILE};
     size_t globalTransp1[2]= {mkGlobalDim(buffs.width, TILE), mkGlobalDim(buffs.height, TILE)};
     size_t globalTransp2[2]= {mkGlobalDim(buffs.height, TILE), mkGlobalDim(buffs.width, TILE)};

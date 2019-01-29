@@ -21,6 +21,7 @@ __kernel void memcpy_simple (
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void naiveTransp( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -34,7 +35,7 @@ __kernel void naiveTransp( __global real* A
     B[gidx*height + gidy] = A[gidy*width + gidx];
 }
 
-
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void coalsTransp( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -58,6 +59,7 @@ __kernel void coalsTransp( __global real* A
         B[gidy*height + gidx] = lmem[lidx*(TILE+1) + lidy];
 } 
 
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void optimTransp( __global real* A
                          , __global real* B
                          , uint32_t height 
@@ -88,6 +90,7 @@ __kernel void optimTransp( __global real* A
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void naiveProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -107,6 +110,7 @@ __kernel void naiveProgrm( __global real* A
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void coalsProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -124,13 +128,13 @@ __kernel void coalsProgrm( __global real* A
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void optimProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width
 ) {
-    // Assumes that GROUP-SIZE is TILE*TILE and GROUP-SIZE is a multiple of CHUNK
-    volatile __local real lmem[TILE*TILE][CHUNK+1];
+    volatile __local real lmem[TILE*TILE][CHUNK+1]; // CHUNK+1? to avoid bank conflicts?
     uint32_t gid        = get_global_id(0);
     uint32_t lid        = get_local_id(0);
     uint32_t chunk_lane = lid % CHUNK;
@@ -183,12 +187,13 @@ __kernel void optimProgrm( __global real* A
 }
 
 #define CWAVE 16
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void optimProgrm1( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width
 ) {
-    // Assumes that GROUP-SIZE is TILE*TILE and GROUP-SIZE is a multiple of CWAVE
+    // Assumes that PRG_WGSIZE is a multiple of CWAVE
     volatile __local  real lmem[TILE*TILE/2][CWAVE+1];
     real  dchunk[CWAVE];
     uint32_t gid        = get_global_id(0);

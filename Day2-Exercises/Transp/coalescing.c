@@ -4,11 +4,11 @@
 typedef float real;
 #define REAL_STR "float"
 
-#define TILE   16
-#define CHUNK  16   // CHUNK must divide TILE^2
+#define TILE   8
+#define CHUNK  16   // CHUNK must divide PRG_WGSIZE
 #define PRG_WGSIZE (CHUNK*8)
-#define HEIGHT 67537
-#define WIDTH  64
+#define HEIGHT 150000
+#define WIDTH  63
 
 #define RUNS_CPU 1
 #define RUNS_GPU 175
@@ -239,7 +239,7 @@ void timeGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
  */
 cl_int runGPUcoalsProgram() {
     cl_int ciErr1 = CL_SUCCESS;
-    const size_t dummy = 8;
+    const size_t dummy = TILE;
     // this is the local workgroup size for transposition!
     // fill in the correct 
     size_t localTransp[2] = {dummy, dummy};
@@ -255,7 +255,7 @@ cl_int runGPUcoalsProgram() {
                                          globalTransp1, localTransp, 0, NULL, NULL);
     }
     { // execute coalesced program; the kernel arguments have been already set elsewhere
-        size_t localWorkSize  = dummy*dummy;
+        size_t localWorkSize  = PRG_WGSIZE; // this is correct; defined at top of the file
         size_t globalWorkSize = dummy*dummy;
 
         ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kers.coalsProgrm, 1, NULL,

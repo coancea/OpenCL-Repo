@@ -70,7 +70,7 @@
 \newcommand{\myindu}[1]{^{#1}}
 
 
-\title{OpenCL day 2: Optimizing Temporal and Spatial Locality}
+\title{OpenCL Day 2: Loop Reasoning, Optimizing Temporal and Spatial Locality}
 
 \author{Cosmin Oancea and Troels Henriksen}
 
@@ -80,7 +80,7 @@
 
 \frame{\titlepage}
 
-\section{Course Contents}
+\section{Content of Day2 Lecture:}
 
 \begin{frame}
   \tableofcontents
@@ -204,6 +204,7 @@ in iteration $\vec{k}$ to $S2$ in $\vec{l}$ ($\vec{k}\leq\vec{l}$).
     \item[1.] $\vec{D}(\vec{k},\vec{l})_m = $~``{\tt{}<}'' if $\vec{k}_m < \vec{l}_m$,
     \item[2.] $\vec{D}(\vec{k},\vec{l})_m = $~``{\tt{}=}'' if $\vec{k}_m = \vec{l}_m$,
     \item[3.] $\vec{D}(\vec{k},\vec{l})_m = $~``{\tt{}>}'' if $\vec{k}_m > \vec{l}_m$.
+    \item[4.] $\vec{D}(\vec{k},\vec{l})_m = $~``{\tt{}*}'' otherwise.
 \end{description}
 
 \medskip
@@ -282,8 +283,7 @@ S1\mymath{\rightarrow}S1: \emp{[<,>]}
 \end{columns}
 \end{block} 
 
-{\bf Th. Parallelism:} A loop in a loop nest is parallel {\em iff} all its directions
-are either {\tt =} or there exists an outer loop whose corresponding direction is {\tt <}. 
+{\bf Th. Parallelism:} A loop in a loop nest is parallel {\em iff} for each entry in its direction column, the entry is either {\tt =} or there exists an outer loop whose corresponding direction is {\tt <}. 
 
 \smallskip
 
@@ -625,7 +625,7 @@ B = transpose(B');
             of the RAW cross-iteration dependencies on {\tt accum}.\bigskip
     \item The transformed program performs about $3\times$ the number
             of global-memory accesses than the original. \pause\smallskip
-    \item But it is about $6\times$ slower because of uncoalesced accesses.
+    \item But it is significantly faster than the original (on GPUs).
 \end{itemize}
 
 \end{frame}
@@ -692,79 +692,69 @@ __kernel void naiveTransp( __global real* A, __global real* B
 
 \end{frame}
 
-\begin{frame}[fragile,t]
-  \frametitle{Coalesced Transposition Kernel} 
+\subsection{Coding Exercise: Entirely-Coalesced Transposition}
 
+\begin{frame}[fragile,t]
+  \frametitle{Exercise 1: Fill In Coalesced Transposition Kernel} 
+\vspace{-1ex}
 \begin{colorcode}[fontsize=\scriptsize]
-__kernel void coalsTransp coalsTransp( __global real* A, 
+// verifies that workgroup size is: TILE*TILE
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
+__kernel void coalsTransp( __global real* A, 
         __global real* B, uint32_t height, uint32_t width ) \{
-  __local float tile[T][T];                          \red{// local memory}
+  __local float tile[TILE][TILE];                    \red{// local memory}
   int gidx = get_global_id(0); int gidy = get_global_id(1);
   int lidx = get_local_id(0);  int lidy = get_local_id(1);
 
-  if( gidx < width && gidy < height )          \red{// cannot return here!}
-    lmem[lidy*T + lidx] = A[gidy*width + gidx]; \red{// copy to local mem!}
-  \red{barrier(CLK_LOCAL_MEM_FENCE); // all threads have to reach barrier!}
-
-  gidx = get_group_id(1)*T + lidx; gidy = get_group_id(0)*T + lidy;
-  if( gidx < height && gidy < width )
-      B[gidy*height + gidx] = lmem[lidx*T + lidy];
+  // 1. read current element from global to local memory.
+  //    make sure to NOT access arrays out of bounds!
+  // 2. current thread loads from local memory the transposed element
+  //    at workgroup level, and writes it in the proper position in B.
+  //    Useful functions: get_group_id(0), get_local_size(0); or 1.
+  // 3. Insert necessary workgroup-level synchronization
+  //    barrier(CLK_LOCAL_MEM_FENCE);
 \}
 \end{colorcode}
 
-Transposing a (blocked) matrix $\equiv$ moving each block to the transposed position $+$ transposing each block!\medskip
+Transposing a (blocked) matrix $\equiv$ moving each block to 
+the transposed position $+$ transposing each block!\medskip
 
 \pause
-The trick to achieve coalesced access is to:
 \begin{itemize}
-    \item each thread {\tt (y,x)} in an workgroup reads element at index 
-          {\tt (y,x)} in the corresponding block (from global memory)
-    \item stores it in local memory
-    \item each thread write element \emph{\tt (x,y)} to the transposed matrix.
+    \item \emp{Implement in {\tt Day2-Exercises/Transp/kernels.cl}}
+    \item Are the read and write accesses to global memory coalesced?
+    \item Why/Where should you place the barrier?
 \end{itemize}
 
 \end{frame}
 
-\subsection{Matrix Transposition with Only Coalesced Accesses}
-
-\begin{frame}[fragile,t]
-  \frametitle{Coalesced Transposition Kernel} 
-
-\begin{colorcode}[fontsize=\scriptsize]
-__kernel void coalsTransp coalsTransp( __global real* A, 
-        __global real* B, uint32_t height, uint32_t width ) \{
-  __local float tile[T][T];                          \red{// local memory}
-  int gidx = get_global_id(0); int gidy = get_global_id(1);
-  int lidx = get_local_id(0);  int lidy = get_local_id(1);
-
-  if( gidx < width && gidy < height )          \red{// cannot return here!}
-    lmem[lidy*T + lidx] = A[gidy*width + gidx]; \red{// copy to local mem!}
-  \red{barrier(CLK_LOCAL_MEM_FENCE); // all threads have to reach barrier!}
-
-  gidx = get_group_id(1)*T + lidx; gidy = get_group_id(0)*T + lidy;
-  if( gidx < height && gidy < width )
-      B[gidy*height + gidx] = lmem[lidx*T + lidy];
-\}
-\end{colorcode}
-
-Transposing a (blocked) matrix $\equiv$ moving each block to the transposed position $+$ transposing each block!\medskip
-
-\pause
-The trick to achieve coalesced access is to:
-\begin{itemize}
-    \item each thread {\tt (y,x)} in an workgroup reads element at index 
-          {\tt (y,x)} in the corresponding block (from global memory)
-    \item stores it in local memory
-    \item each thread write element \emph{\tt (x,y)} to the transposed matrix.
-\end{itemize}
-
-\end{frame}
+%\begin{frame}[fragile,t]
+%  \frametitle{Coalesced Transposition Kernel} 
+%
+%\begin{colorcode}[fontsize=\scriptsize]
+%__kernel void coalsTransp coalsTransp( __global real* A, 
+%        __global real* B, uint32_t height, uint32_t width ) \{
+%  __local float tile[T][T];                          \red{// local memory}
+%  int gidx = get_global_id(0); int gidy = get_global_id(1);
+%  int lidx = get_local_id(0);  int lidy = get_local_id(1);
+%
+%  if( gidx < width && gidy < height )          \red{// cannot return here!}
+%    lmem[lidy*T + lidx] = A[gidy*width + gidx]; \red{// copy to local mem!}
+%  \red{barrier(CLK_LOCAL_MEM_FENCE); // all threads have to reach barrier!}
+%
+%  gidx = get_group_id(1)*T + lidx; gidy = get_group_id(0)*T + lidy;
+%  if( gidx < height && gidy < width )
+%      B[gidy*height + gidx] = lmem[lidx*T + lidy];
+%\}
+%\end{colorcode}
+%
+%\end{frame}
 
 
 \subsection{Program Optimized By Transposition + Coding Exercise}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 1: Coalescing By Transposition} 
+  \frametitle{Exercise 2: Coalescing By Transposition} 
 
 \begin{columns}
 \column{0.42\textwidth}
@@ -800,7 +790,7 @@ B = transpose(B');
 
 \begin{itemize}
     \item Open File "Day2-Exercises/Transp/coalescing.c", function named "runGPUcoalsProgram".
-    \item Fill the correct sizes for the "coalsProgrm" kernel.
+    \item Fill the correct sizes for the "coalsProgrm" kernel call.
     \item Open File "Day2-Exercises/Transp/kernels.cl" and implement kernel named "coalsProgrm".
     \item Fix bugs until it validates! :-)
     \item What is the speedup with respect to the naive program?
@@ -813,19 +803,19 @@ B = transpose(B');
 \subsection{Fully Fused Program + Coding Exercise}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 2: Fused Program With Coalesced Accesses}
+  \frametitle{Exercise 3: Fused Program With Coalesced Accesses}
 
 \begin{itemize}
     \item Open File "Day2-Exercises/Transp/kernels.cl" and implement the missing pieces from kernel named "optimProgrm";\bigskip
     \item The idea is to have coalesced accesses "fused" into the kernel by each 
             thread processing {\tt CHUNK} elements at a time by:\smallskip
     \begin{itemize}
-        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} elements from global to local memory
+        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} input elements from global to local memory
                 in coalesced fashion;\smallskip
         \item each thread now processes {\tt CHUNK} elements from its row;\smallskip
-        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} elements from local to global memory
+        \item collectively copying {\tt CHUNK * WORKGROUP\_SIZE} result elements from local to global memory
                 in coalesced fashion;\smallskip
-        \item repeat in a (sequential kernel) loop until all row's elements have been processed! 
+        \item repeat in a loop (inside the kernel) until all row's elements have been processed! 
     \end{itemize}\bigskip
     \item Fix bugs until it validates! :-)\bigskip
     \item What is the speedup with respect to the transposition-optimized program?\bigskip
@@ -1166,96 +1156,88 @@ OpenCL equivalences: \pause
 \end{frame}
 
 
-\section{Recognizing Reduction, Segmented Scan}
-\begin{frame}[fragile,t]
-  \frametitle{Reduction is Typically Easy To Recognize} 
-
-If all the statements in which a scalar variable {\tt x} appears
-are of the form {\tt x $\oplus$ = $exp$}, where {\tt x} does 
-not appear in $\exp$ and $\oplus$ is associative 
-then the cross-iteration RAWs on {\tt x} can be resolved by:
-\begin{itemize}
-    \item privatizing {\tt x} initialized with the neutral element,
-    \item computing the per-processor partial values of {\tt x},
-    \item reducing the {\tt x}s across processors and with the initial value.
-\end  {itemize} 
-
-\begin{columns}
-\column{0.4\textwidth}
-\begin{colorcode}[fontsize=\scriptsize]
-// compilation requires g++ -fopenmp ...
-  float x = 6.0;
-\#pragma omp parallel for reduction(+:x) private(i,j)
-  for(i=1; i<N; i++) \{
-    for(j=1; j<N; j++) \{
-      if ( A[i,j] >= 2.0 )    \emph{x += 2*A[i,j-1]};
-      else if( A[i,j] > 0.0 ) \emph{x += A[i-1,j+1];}
-    \}
-    if (i \% (j+1) == 3) \emph{x += A[i,i];}
-  \}
-\end{colorcode}
-\column{0.53\textwidth}
-
-\end{columns}
-\end{frame}
-
-
-\begin{frame}[fragile,t]
-  \frametitle{Scan and Segmented Scan Are Difficult!} 
-
-Compilers cannot recognize and parallelize even simple scans:
-\begin{itemize}
-    \item they raise a cross-iteration true dependency (RAW),
-    \item they appear in a multitude of forms,
-    \item hence they are difficult to analyze.
-\end  {itemize} 
-
-\begin{columns}
-\column{0.4\textwidth}
-\begin{colorcode}[fontsize=\scriptsize]
-// What kind of scans are these?
-1. A[0] = B[0];
-   for(i=1; i<N; i++) \{
-     A[i] = A[i-1] + B[i];
-   \}
-2. acc = 0;
-   for(i=0; i<N; i++)\{
-     acc = acc ^ i;
-     A[i] = acc;
-   \}
-3. for(j=0; j<M; j++) 
-     A[0,j] = B[0,j];
-   for(i=1; i<N; i++) \{
-     for(j=0; j<M; j++)
-       A[i,j] = A[i-1,j] + B[i,j];
-   \}
-\end{colorcode}
-\column{0.53\textwidth}\pause
-\begin{colorcode}[fontsize=\scriptsize]
-1. let A = scan (+) 0 B
-
-2. let A = scan (^) 0 (iota N)
-
-3. let A = scan (\mymath{\backslash} a b -> map2 (+) a b) 
-                (replicate M 0.0) B 
-        \mymath{\equiv}
-   let A = transpose <|
-           map (scanInc (+) 0.0) <|
-           transpose B 
-             
-\end{colorcode}
-\end{columns}
-\bigskip
-
-\end{frame}
-
-
-\section{Programming Exercises}
-
-\begin{frame}
-	\tableofcontents[currentsection]
-\end{frame}
-
+%\section{Recognizing Reduction, Segmented Scan}
+%\begin{frame}[fragile,t]
+%  \frametitle{Reduction is Typically Easy To Recognize} 
+%
+%If all the statements in which a scalar variable {\tt x} appears
+%are of the form {\tt x $\oplus$ = $exp$}, where {\tt x} does 
+%not appear in $\exp$ and $\oplus$ is associative 
+%then the cross-iteration RAWs on {\tt x} can be resolved by:
+%\begin{itemize}
+%    \item privatizing {\tt x} initialized with the neutral element,
+%    \item computing the per-processor partial values of {\tt x},
+%    \item reducing the {\tt x}s across processors and with the initial value.
+%\end  {itemize} 
+%
+%\begin{columns}
+%\column{0.4\textwidth}
+%\begin{colorcode}[fontsize=\scriptsize]
+%// compilation requires g++ -fopenmp ...
+%  float x = 6.0;
+%\#pragma omp parallel for reduction(+:x) private(i,j)
+%  for(i=1; i<N; i++) \{
+%    for(j=1; j<N; j++) \{
+%      if ( A[i,j] >= 2.0 )    \emph{x += 2*A[i,j-1]};
+%      else if( A[i,j] > 0.0 ) \emph{x += A[i-1,j+1];}
+%    \}
+%    if (i \% (j+1) == 3) \emph{x += A[i,i];}
+%  \}
+%\end{colorcode}
+%\column{0.53\textwidth}
+%
+%\end{columns}
+%\end{frame}
+%
+%
+%\begin{frame}[fragile,t]
+%  \frametitle{Scan and Segmented Scan Are Difficult!} 
+%
+%Compilers cannot recognize and parallelize even simple scans:
+%\begin{itemize}
+%    \item they raise a cross-iteration true dependency (RAW),
+%    \item they appear in a multitude of forms,
+%    \item hence they are difficult to analyze.
+%\end  {itemize} 
+%
+%\begin{columns}
+%\column{0.4\textwidth}
+%\begin{colorcode}[fontsize=\scriptsize]
+%// What kind of scans are these?
+%1. A[0] = B[0];
+%   for(i=1; i<N; i++) \{
+%     A[i] = A[i-1] + B[i];
+%   \}
+%2. acc = 0;
+%   for(i=0; i<N; i++)\{
+%     acc = acc ^ i;
+%     A[i] = acc;
+%   \}
+%3. for(j=0; j<M; j++) 
+%     A[0,j] = B[0,j];
+%   for(i=1; i<N; i++) \{
+%     for(j=0; j<M; j++)
+%       A[i,j] = A[i-1,j] + B[i,j];
+%   \}
+%\end{colorcode}
+%\column{0.53\textwidth}\pause
+%\begin{colorcode}[fontsize=\scriptsize]
+%1. let A = scan (+) 0 B
+%
+%2. let A = scan (^) 0 (iota N)
+%
+%3. let A = scan (\mymath{\backslash} a b -> map2 (+) a b) 
+%                (replicate M 0.0) B 
+%        \mymath{\equiv}
+%   let A = transpose <|
+%           map (scanInc (+) 0.0) <|
+%           transpose B 
+%             
+%\end{colorcode}
+%\end{columns}
+%\bigskip
+%
+%\end{frame}
 
 \end{document}
 

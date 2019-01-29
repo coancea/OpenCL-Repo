@@ -20,20 +20,21 @@ __kernel void memcpy_simple (
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void naiveTransp( __global real* A
                          , __global real* B
                          , uint32_t height
                          , uint32_t width 
-) {
-    uint32_t gidx = get_global_id(0); 
-    uint32_t gidy = get_global_id(1); 
+) {                                   // Can also be written as:
+    uint32_t gidx = get_global_id(0); // get_group_id(0)*TILE + get_local_id(0);
+    uint32_t gidy = get_global_id(1); // get_group_id(1)*TILE + get_local_id(1);
 
     if( (gidx >= width) || (gidy >= height) ) return;
 
     B[gidx*height + gidy] = A[gidy*width + gidx];
 }
 
-
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void coalsTransp( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -44,19 +45,9 @@ __kernel void coalsTransp( __global real* A
     uint32_t lidx = get_local_id(0);
     uint32_t gidy = get_global_id(1);
     uint32_t lidy = get_local_id(1);
-
-    if( gidx < width && gidy < height )
-        lmem[lidy*(TILE+1) + lidx] = A[gidy*width + gidx];
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    gidx = get_group_id(1) * TILE + lidx; 
-    gidy = get_group_id(0) * TILE + lidy;
-
-    if( gidx < height && gidy < width )
-        B[gidy*height + gidx] = lmem[lidx*(TILE+1) + lidy];
 } 
 
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void optimTransp( __global real* A
                          , __global real* B
                          , uint32_t height 
@@ -87,6 +78,7 @@ __kernel void optimTransp( __global real* A
     }
 }
 
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void naiveProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
@@ -113,6 +105,7 @@ __kernel void naiveProgrm( __global real* A
  *    Note: "height" and "width" are the height and 
  *          width of "A" not of "Atr" (transpose of "A")!
  */
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void coalsProgrm( __global real* Atr
                          , __global real* Btr
                          , uint32_t height
@@ -139,6 +132,7 @@ __kernel void coalsProgrm( __global real* Atr
  *    However, 16 words of local memory per thread will likely affect occupancy
  *      (negatively).
  */
+__kernel __attribute__((reqd_work_group_size(PRG_WGSIZE, 1, 1)))
 __kernel void optimProgrm( __global real* A
                          , __global real* B
                          , uint32_t height
