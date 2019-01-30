@@ -24,6 +24,7 @@ __kernel void naiveMMM  ( __global real* A
     C[gidy*widthB + gidx] = accum;
 }
 
+__kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void blockMMM  ( __global real* A
                         , __global real* B
                         , __global real* C
@@ -62,6 +63,7 @@ __kernel void blockMMM  ( __global real* A
         C[gidy*widthB + gidx] = accum;
 }
 
+__kernel __attribute__((reqd_work_group_size(RT*RT, 1, 1)))
 __kernel void rgblkMMM  ( __global real* A
                         , __global real* B
                         , __global real* C

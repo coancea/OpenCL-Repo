@@ -47,6 +47,9 @@ OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
 
+size_t mkGlobalDim(const uint32_t pardim, const uint32_t T);
+real arithmFun(real accum, real a);
+
 void initOclControl() {
     char    compile_opts[128];
     sprintf(compile_opts, "-D TILE=%d -D CHUNK=%d -D PRG_WGSIZE=%d -D real=%s", TILE, CHUNK, PRG_WGSIZE, REAL_STR);
@@ -102,8 +105,8 @@ void initTranspKernels() {
         const size_t local_size = TILE * (TILE+1) * sizeof(real);
         kers.coalsTransp = clCreateKernel(ctrl.prog, "coalsTransp", &error);
         OPENCL_SUCCEED(error);
-        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dAtr);
-        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dBtr);
+        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
+        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
         clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
         clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
         clSetKernelArg(kers.coalsTransp, 4, local_size, NULL); // reserve space for local memory

@@ -158,6 +158,7 @@ void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
             for (int32_t i = 0; i < RUNS_GPU; i++) {
                 ciErr1 |= clEnqueueNDRangeKernel(ctrl.queue, kernel, 2, NULL,
                                                  globalWorkSize, localWorkSize, 0, NULL, NULL);
+                OPENCL_SUCCEED(ciErr1);
             }
             clFinish(ctrl.queue);
 #endif

@@ -102,8 +102,8 @@ void initTranspKernels() {
         const size_t local_size = TILE * (TILE+1) * sizeof(real);
         kers.coalsTransp = clCreateKernel(ctrl.prog, "coalsTransp", &error);
         OPENCL_SUCCEED(error);
-        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dAtr);
-        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dBtr);
+        clSetKernelArg(kers.coalsTransp, 0, sizeof(cl_mem), &buffs.dA);
+        clSetKernelArg(kers.coalsTransp, 1, sizeof(cl_mem), &buffs.dB);
         clSetKernelArg(kers.coalsTransp, 2, sizeof(cl_int), &buffs.height);
         clSetKernelArg(kers.coalsTransp, 3, sizeof(cl_int), &buffs.width);
         clSetKernelArg(kers.coalsTransp, 4, local_size, NULL); // reserve space for local memory

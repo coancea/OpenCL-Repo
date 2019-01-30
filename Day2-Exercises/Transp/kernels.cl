@@ -52,6 +52,8 @@ __kernel void coalsTransp( __global real* A
     uint32_t lidx = get_local_id(0);
     uint32_t gidy = get_global_id(1);
     uint32_t lidy = get_local_id(1);
+    if( (gidx >= width) || (gidy >= height) ) return;
+    B[gidx*height+gidy] = 0;
 } 
 
 __kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
