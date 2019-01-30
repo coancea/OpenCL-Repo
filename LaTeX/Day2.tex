@@ -952,7 +952,7 @@ Thus, we cut the number of global-memory accesses by a {\tt T} factor.
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 4: Implement Block-Tiled Matrix Multiplication}
 
 \begin{itemize}
     \item Open File "Day2-Exercises/MMMult/mmm.c", function named "runGPUverMMM".
@@ -970,7 +970,7 @@ The parallel iteration space is block tiled, not the matrices:
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 4: Implement Block-Tiled Matrix Multiplication}
 \begin{tiny}
 \emph{Copy {\tt A[ii:MIN(ii+T,M)][kk:MIN(kk+T,U)]} in {\tt A\_loc} of size {\tt[T][T]}}\\
 \emph{Copy {\tt B[kk:MIN(kk+T,U)][jj:MIN(jj+T,N)]} in {\tt B\_loc} of size {\tt[T][T]}}\\
@@ -1006,7 +1006,7 @@ Local memory declared with: {\tt~~\_\_local float A\_loc[T][T];}
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 3: Implement Block-Tiled Matrix Multiplication}
+  \frametitle{Exercise 4: Implement Block-Tiled Matrix Multiplication}
 \begin{tiny}
 \emph{Loops of index {\tt i} and {\tt j} form the local workgroup.}
 Interchange them innermost and distribute them:\\
@@ -1053,7 +1053,7 @@ Local memory declared with: {\tt~~\_\_local float A\_loc[T][T];}
 \subsection{Register-Tiled Matrix Multiplication + Coding Exercise}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 4: Matrix Multiplication by Register+Block Tiling}
+  \frametitle{Exercise 5: Register+Block Tiled Matrix Multiplication}
 
 \begin{columns}
 \column{0.64\textwidth}
@@ -1094,7 +1094,7 @@ Do not forget to perform array expansion on {\tt c}, which we will rename {\tt c
 
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 4: Register+Block Tiled Matrix Multiplication}
+  \frametitle{Exercise 5: Register+Block Tiled Matrix Multiplication}
 
 \begin{colorcode}[fontsize=\tiny]
 unsigned int ii, i, jjj, jj, j, kk, k;
@@ -1131,26 +1131,26 @@ unsigned int ii, i, jjj, jj, j, kk, k;
 
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 4: Register+Block Tiled Matrix Multiplication}
+  \frametitle{Exercise 5: Register+Block Tiled Matrix Multiplication}
 
 \begin{itemize}
     \item Open File "Day2-Exercises/MMMult/mmm.c", function named "runGPUverMMM".
     \item Fill the correct sizes for the "rgblkMMM" kernel.
     \item Open File "Day2-Exercises/MMMult/mmm.cl" and implement kernel named "rgblkMMM".
-    \item Fix bugs until it validates! :-)
+    \item Fix bugs until it validates! :-)  \red{Tile size is called RT} and not T!
 \end{itemize}
 
 OpenCL equivalences: \pause
 \begin{itemize}
-    \item Global worksize 1: $\lceil M/T \rceil$; Global worksize 0: $\lceil M/T^2 \rceil * T^2$;
-    \item Local worksize 1 and 0: both $T$;
-    \item {\tt ii = get\_group\_id(1) * T}\\
-          {\tt jjj = get\_group\_id(0) * T$^2$}\\
-          {\tt jj = jjj + get\_local\_id(1) * T}\\
-          {\tt j = jj + get\_local\_id(0)};
-    \item Loops of index {\tt i} should be normalized {\tt[0..T-1]} and unrolled ({\tt \#pragma unroll});
-    \item Array {\tt cs} should be one dimensional: {\tt float cs[T];}
-    \item Use {\tt \_\_local real A\_loc[T][T+1];} for bank conflicts.
+    \item Global worksize 1: $\lceil M/RT \rceil$; Global worksize 0: $\lceil N/RT^2 \rceil * RT^2$;
+    \item Local worksize 0: RT$^2$; Local worksize 1: 1;
+    \item {\tt ii = get\_group\_id(1) * RT;}\\
+          {\tt j = jj + get\_global\_id(0);}\\
+          {\tt locx = get\_local\_id(0) \% RT;}\\
+          {\tt locy = get\_local\_id(0) / RT;}\\
+    \item Loops of index {\tt i} should be normalized {\tt[0..RT-1]} and unrolled ({\tt \#pragma unroll});
+    \item Array {\tt cs} should be one dimensional: {\tt float cs[RT];}
+    \item {\tt \_\_local real A\_loc[RT][RT+1];} for bank conflicts.
 \end{itemize}
 
 \end{frame}
