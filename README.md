@@ -39,7 +39,7 @@ Fill in the blank exercises:
 
 * maybe naive matrix-matrix multiplication
 
-### DAY 2
+### DAY 2 ([slides](Day2.pdf))
 
 I. Lecture 9:00 - 12:00:
 
