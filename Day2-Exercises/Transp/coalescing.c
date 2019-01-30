@@ -4,10 +4,10 @@
 typedef float real;
 #define REAL_STR "float"
 
-#define TILE   8
+#define TILE   16
 #define CHUNK  16   // CHUNK must divide PRG_WGSIZE
-#define PRG_WGSIZE (CHUNK*8)
-#define HEIGHT 150000
+#define PRG_WGSIZE 64
+#define HEIGHT 100000
 #define WIDTH  63
 
 #define RUNS_CPU 1

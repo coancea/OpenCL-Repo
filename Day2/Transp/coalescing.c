@@ -6,8 +6,8 @@ typedef float real;
 
 #define TILE   16
 #define CHUNK  16   // CHUNK must divide TILE^2
-#define PRG_WGSIZE (CHUNK*8)
-#define HEIGHT 150000//67537
+#define PRG_WGSIZE 64
+#define HEIGHT 100000//67537
 #define WIDTH  63 // it does NOT like powers of two
 
 #define RUNS_CPU 1

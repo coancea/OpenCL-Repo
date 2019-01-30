@@ -34,6 +34,13 @@ __kernel void naiveTransp( __global real* A
     B[gidx*height + gidy] = A[gidy*width + gidx];
 }
 
+/**
+ * Exercise 1 (Coalesced transposition): 
+ *    ToDo: Implement the kernel below such that both
+ *          reads and writes are coalesced.
+ *    Note: "height" and "width" are the height and 
+ *          width of "A" not of "B" (transpose of "A")!
+ */
 __kernel __attribute__((reqd_work_group_size(TILE, TILE, 1)))
 __kernel void coalsTransp( __global real* A
                          , __global real* B
@@ -99,7 +106,7 @@ __kernel void naiveProgrm( __global real* A
 }
 
 /**
- * Exercise 1 (Optimize coalescing by transposition): 
+ * Exercise 2 (Optimize coalescing by transposition): 
  *    ToDo: Implement the kernel below that reads/writes
  *          from/to the transposed version of A and B!
  *    Note: "height" and "width" are the height and 
@@ -114,7 +121,7 @@ __kernel void coalsProgrm( __global real* Atr
 }
 
 /**
- * Exercise 2 (Optimize coalescing by transposition): 
+ * Exercise 3 (Optimize coalescing by transposition): 
  *    ToDo: complete the implementation of the kernel below which
  *          processes a row of "A" per thread by streaming it,
  *          i.e., each threads processes CHUNK elements on its row
