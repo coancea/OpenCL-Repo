@@ -9,7 +9,7 @@ void benchmark_sequential_reduction(int n, cl_int *input, cl_int *output) {
   }
   int64_t aft = get_wall_time();
 
-  printf("Sequential reduction: %dμs\n", (int)(aft-bef));
+  printf("Sequential reduction:\t%dμs\n", (int)(aft-bef));
 
   *output = result;
 }
@@ -56,7 +56,125 @@ void benchmark_tree_reduction(cl_context ctx, cl_command_queue queue, cl_device_
   OPENCL_SUCCEED(clFinish(queue));
   int64_t aft = get_wall_time();
 
-  printf("Parallel reduction: %dμs\n", (int)(aft-bef));
+  printf("Tree reduction:  \t%dμs\n", (int)(aft-bef));
+
+  clEnqueueReadBuffer(queue, mem_a,
+                      CL_TRUE,
+                      0, sizeof(cl_int),
+                      output,
+                      0, NULL, NULL);
+
+  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
+  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
+}
+
+void benchmark_group_reduction(cl_context ctx, cl_command_queue queue, cl_device_id device,
+                               cl_int n, cl_int *input, cl_int *output) {
+  cl_int error = CL_SUCCESS;
+
+  cl_program program = opencl_build_program(ctx, device, "kernels/group_reduction.cl",
+                                            "-Delem_t=int");
+  cl_kernel group_reduction_k = clCreateKernel(program, "group_reduction", &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                n*sizeof(cl_int), input, &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
+                                n*sizeof(cl_int), NULL, &error);
+  OPENCL_SUCCEED(error);
+
+  OPENCL_SUCCEED(clFinish(queue));
+
+  int64_t bef = get_wall_time();
+  while (n > 1) {
+    int m = div_rounding_up(n, 256);
+
+    size_t local_work_size[1] = { 256 };
+    size_t global_work_size[1] = { m * local_work_size[0] };
+
+    clSetKernelArg(group_reduction_k, 0, sizeof(cl_int), &n);
+    clSetKernelArg(group_reduction_k, 1, sizeof(cl_mem), &mem_a);
+    clSetKernelArg(group_reduction_k, 2, sizeof(cl_mem), &mem_b);
+    clSetKernelArg(group_reduction_k, 3, local_work_size[0]*sizeof(cl_int), NULL);
+
+    OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, group_reduction_k, 1, NULL, global_work_size, local_work_size, 0, NULL, NULL));
+
+    n = m;
+
+    cl_mem mem_c = mem_a;
+    mem_a = mem_b;
+    mem_b = mem_c;
+  }
+  OPENCL_SUCCEED(clFinish(queue));
+  int64_t aft = get_wall_time();
+
+  printf("Group reduction:\t%dμs\n", (int)(aft-bef));
+
+  clEnqueueReadBuffer(queue, mem_a,
+                      CL_TRUE,
+                      0, sizeof(cl_int),
+                      output,
+                      0, NULL, NULL);
+
+  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
+  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
+}
+
+void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_device_id device,
+                                 cl_int n, cl_int *input, cl_int *output) {
+  cl_int error = CL_SUCCESS;
+
+  cl_program program = opencl_build_program(ctx, device, "kernels/chunked_reduction.cl",
+                                            "-Delem_t=int");
+  cl_kernel group_reduction_k = clCreateKernel(program, "chunked_reduction", &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                n*sizeof(cl_int), input, &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
+                                n*sizeof(cl_int), NULL, &error);
+  OPENCL_SUCCEED(error);
+
+  OPENCL_SUCCEED(clFinish(queue));
+
+  int64_t bef = get_wall_time();
+
+  cl_int num_groups = 128;
+  size_t stage_one_local_work_size[1] = { 256 };
+  size_t stage_one_global_work_size[1] = { num_groups * stage_one_local_work_size[0] };
+
+  clSetKernelArg(group_reduction_k, 0, sizeof(cl_int), &n);
+  clSetKernelArg(group_reduction_k, 1, sizeof(cl_mem), &mem_a);
+  clSetKernelArg(group_reduction_k, 2, sizeof(cl_mem), &mem_b);
+  clSetKernelArg(group_reduction_k, 3, stage_one_local_work_size[0]*sizeof(cl_int), NULL);
+
+  OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, group_reduction_k, 1, NULL,
+                                        stage_one_global_work_size,
+                                        stage_one_local_work_size,
+                                        0, NULL, NULL));
+
+  // Run a single-group kernel with mem_a and mem_b flipped.
+
+  size_t stage_two_local_work_size[1] = { num_groups };
+  size_t stage_two_global_work_size[1] = { stage_two_local_work_size[0] };
+  clSetKernelArg(group_reduction_k, 0, sizeof(cl_int), &num_groups);
+  clSetKernelArg(group_reduction_k, 1, sizeof(cl_mem), &mem_b);
+  clSetKernelArg(group_reduction_k, 2, sizeof(cl_mem), &mem_a);
+  clSetKernelArg(group_reduction_k, 3, num_groups*sizeof(cl_int), NULL);
+
+  OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, group_reduction_k, 1, NULL,
+                                        stage_two_global_work_size,
+                                        stage_two_local_work_size,
+                                        0, NULL, NULL));
+
+  OPENCL_SUCCEED(clFinish(queue));
+  int64_t aft = get_wall_time();
+
+  printf("Chunked reduction:\t%dμs\n", (int)(aft-bef));
 
   clEnqueueReadBuffer(queue, mem_a,
                       CL_TRUE,
@@ -93,5 +211,17 @@ int main(int argc, char** argv) {
   benchmark_sequential_reduction(n, input, &correct);
 
   benchmark_tree_reduction(ctx, queue, device, n, input, &output);
-  assert(correct == output);
+  if (correct != output) {
+    printf("Invalid result: got %d, expected %d\n", output, correct);
+  }
+
+  benchmark_group_reduction(ctx, queue, device, n, input, &output);
+  if (correct != output) {
+    printf("Invalid result: got %d, expected %d\n", output, correct);
+  }
+
+  benchmark_chunked_reduction(ctx, queue, device, n, input, &output);
+  if (correct != output) {
+    printf("Invalid result: got %d, expected %d\n", output, correct);
+  }
 }
