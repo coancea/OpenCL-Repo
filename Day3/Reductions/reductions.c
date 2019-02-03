@@ -206,7 +206,7 @@ void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_devi
     clSetKernelArg(chunked_reduction_k, 0, sizeof(cl_int), &num_groups);
     clSetKernelArg(chunked_reduction_k, 1, sizeof(cl_mem), &mem_b);
     clSetKernelArg(chunked_reduction_k, 2, sizeof(cl_mem), &mem_a);
-    clSetKernelArg(chunked_reduction_k, 3, num_groups*sizeof(cl_int), NULL);
+    clSetKernelArg(chunked_reduction_k, 3, stage_two_local_work_size[0]*sizeof(cl_int), NULL);
 
     OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, chunked_reduction_k, 1, NULL,
                                           stage_two_global_work_size,
