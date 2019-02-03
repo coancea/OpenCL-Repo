@@ -1,5 +1,7 @@
 #include "../../clutils.h"
 
+const int runs = 10;
+
 void benchmark_sequential_reduction(int n, cl_int *input, cl_int *output) {
   int result = 0;
 
@@ -15,6 +17,7 @@ void benchmark_sequential_reduction(int n, cl_int *input, cl_int *output) {
 }
 
 void benchmark_tree_reduction(cl_context ctx, cl_command_queue queue, cl_device_id device,
+                              cl_mem mem_a, cl_mem mem_b,
                               cl_int n, cl_int *input, cl_int *output) {
   cl_int error = CL_SUCCESS;
 
@@ -23,15 +26,11 @@ void benchmark_tree_reduction(cl_context ctx, cl_command_queue queue, cl_device_
   cl_kernel tree_reduction_k = clCreateKernel(program, "tree_reduction", &error);
   OPENCL_SUCCEED(error);
 
-  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                n*sizeof(cl_int), input, &error);
-  OPENCL_SUCCEED(error);
 
-  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
-                                n*sizeof(cl_int), NULL, &error);
-  OPENCL_SUCCEED(error);
-
-  OPENCL_SUCCEED(clFinish(queue));
+  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, mem_a, CL_TRUE,
+                                      0, n * sizeof(cl_int),
+                                      input,
+                                      0, NULL, NULL));
 
   int64_t bef = get_wall_time();
   while (n > 1) {
@@ -63,12 +62,10 @@ void benchmark_tree_reduction(cl_context ctx, cl_command_queue queue, cl_device_
                       0, sizeof(cl_int),
                       output,
                       0, NULL, NULL);
-
-  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
-  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
 }
 
 void benchmark_group_reduction(cl_context ctx, cl_command_queue queue, cl_device_id device,
+                               cl_mem mem_a, cl_mem mem_b,
                                cl_int n, cl_int *input, cl_int *output) {
   cl_int error = CL_SUCCESS;
 
@@ -77,16 +74,10 @@ void benchmark_group_reduction(cl_context ctx, cl_command_queue queue, cl_device
   cl_kernel group_reduction_k = clCreateKernel(program, "group_reduction", &error);
   OPENCL_SUCCEED(error);
 
-  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                n*sizeof(cl_int), input, &error);
-  OPENCL_SUCCEED(error);
-
-  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
-                                n*sizeof(cl_int), NULL, &error);
-  OPENCL_SUCCEED(error);
-
-  OPENCL_SUCCEED(clFinish(queue));
-
+  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, mem_a, CL_TRUE,
+                                      0, n * sizeof(cl_int),
+                                      input,
+                                      0, NULL, NULL));
   int64_t bef = get_wall_time();
   while (n > 1) {
     int m = div_rounding_up(n, 256);
@@ -117,12 +108,10 @@ void benchmark_group_reduction(cl_context ctx, cl_command_queue queue, cl_device
                       0, sizeof(cl_int),
                       output,
                       0, NULL, NULL);
-
-  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
-  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
 }
 
 void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_device_id device,
+                                 cl_mem mem_a, cl_mem mem_b,
                                  cl_int n, cl_int *input, cl_int *output) {
   cl_int error = CL_SUCCESS;
 
@@ -131,15 +120,10 @@ void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_devi
   cl_kernel group_reduction_k = clCreateKernel(program, "chunked_reduction", &error);
   OPENCL_SUCCEED(error);
 
-  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                n*sizeof(cl_int), input, &error);
-  OPENCL_SUCCEED(error);
-
-  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
-                                n*sizeof(cl_int), NULL, &error);
-  OPENCL_SUCCEED(error);
-
-  OPENCL_SUCCEED(clFinish(queue));
+  OPENCL_SUCCEED(clEnqueueWriteBuffer(queue, mem_a, CL_TRUE,
+                                      0, n * sizeof(cl_int),
+                                      input,
+                                      0, NULL, NULL));
 
   int64_t bef = get_wall_time();
 
@@ -181,9 +165,6 @@ void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_devi
                       0, sizeof(cl_int),
                       output,
                       0, NULL, NULL);
-
-  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
-  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
 }
 
 int main(int argc, char** argv) {
@@ -207,21 +188,43 @@ int main(int argc, char** argv) {
     input[i] = i;
   }
 
+  cl_int error;
   cl_int correct, output;
   benchmark_sequential_reduction(n, input, &correct);
 
-  benchmark_tree_reduction(ctx, queue, device, n, input, &output);
+  // Create memory here (and fill them with data) to ensure they are
+  // not first faulted onto the device when the first kernel is
+  // executed.
+  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                n*sizeof(cl_int), input, &error);
+  OPENCL_SUCCEED(error);
+
+  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                n*sizeof(cl_int), input, &error);
+  OPENCL_SUCCEED(error);
+
+  OPENCL_SUCCEED(clFinish(queue));
+
+  benchmark_tree_reduction(ctx, queue, device,
+                           mem_a, mem_b, n, input, &output);
   if (correct != output) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
 
-  benchmark_group_reduction(ctx, queue, device, n, input, &output);
+  benchmark_group_reduction(ctx, queue, device,
+                            mem_a, mem_b,
+                            n, input, &output);
   if (correct != output) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
 
-  benchmark_chunked_reduction(ctx, queue, device, n, input, &output);
+  benchmark_chunked_reduction(ctx, queue, device,
+                              mem_a, mem_b,
+                              n, input, &output);
   if (correct != output) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
+
+  OPENCL_SUCCEED(clReleaseMemObject(mem_a));
+  OPENCL_SUCCEED(clReleaseMemObject(mem_b));
 }
