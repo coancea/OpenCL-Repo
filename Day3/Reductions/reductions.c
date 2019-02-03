@@ -326,12 +326,20 @@ int main(int argc, char** argv) {
 
   OPENCL_SUCCEED(clFinish(queue));
 
+  cl_int zero = 0;
+  OPENCL_SUCCEED(clEnqueueFillBuffer(queue, mem_b, &zero, sizeof(cl_int), 0, k*sizeof(cl_int),
+                                     0, NULL, NULL));
+  OPENCL_SUCCEED(clFinish(queue));
   benchmark_tree_reduction(ctx, queue, device,
                            mem_a, mem_b, n, input, &output);
   if (correct != output) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
 
+
+  OPENCL_SUCCEED(clEnqueueFillBuffer(queue, mem_b, &zero, sizeof(cl_int), 0, k*sizeof(cl_int),
+                                     0, NULL, NULL));
+  OPENCL_SUCCEED(clFinish(queue));
   benchmark_group_reduction(ctx, queue, device,
                             mem_a, mem_b,
                             n, input, &output);
@@ -339,6 +347,9 @@ int main(int argc, char** argv) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
 
+  OPENCL_SUCCEED(clEnqueueFillBuffer(queue, mem_b, &zero, sizeof(cl_int), 0, k*sizeof(cl_int),
+                                     0, NULL, NULL));
+  OPENCL_SUCCEED(clFinish(queue));
   benchmark_chunked_reduction(ctx, queue, device,
                               mem_a, mem_b,
                               n, input, &output);
@@ -346,6 +357,9 @@ int main(int argc, char** argv) {
     printf("Invalid result: got %d, expected %d\n", output, correct);
   }
 
+  OPENCL_SUCCEED(clEnqueueFillBuffer(queue, mem_b, &zero, sizeof(cl_int), 0, k*sizeof(cl_int),
+                                     0, NULL, NULL));
+  OPENCL_SUCCEED(clFinish(queue));
   benchmark_atomic_reduction(ctx, queue, device,
                              mem_a, mem_b,
                              n, input, &output);
