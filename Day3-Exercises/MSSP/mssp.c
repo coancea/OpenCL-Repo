@@ -77,7 +77,7 @@ void benchmark_tree_mssp(cl_context ctx, cl_command_queue queue, cl_device_id de
   cl_kernel mssp_init_k = clCreateKernel(program, "mssp_init", &error);
   OPENCL_SUCCEED(error);
 
-  cl_event *events = calloc(runs * (intlog(orig_n, 2)+1), sizeof(cl_event));
+  cl_event *events = calloc(runs * (1+intlog(orig_n, 2)), sizeof(cl_event));
   int events_created = 0;
 
   cl_mem mem_a, mem_b, mem_c;
@@ -162,7 +162,7 @@ void benchmark_group_mssp(cl_context ctx, cl_command_queue queue, cl_device_id d
   OPENCL_SUCCEED(error);
 
   size_t group_size = 256;
-  cl_event *events = calloc(runs * intlog(orig_n, group_size), sizeof(cl_event));
+  cl_event *events = calloc(runs * (1+intlog(orig_n, group_size)), sizeof(cl_event));
   int events_created = 0;
 
   cl_mem mem_a, mem_b, mem_c;

@@ -37,14 +37,13 @@ kernel void chunked_mssp_stage_one(int n, global int *input, global int4 *output
 
   int group_size = get_local_size(0);
   int num_threads = get_global_size(0);
-  int num_groups = get_global_size(0)/group_size;
 
   // How many chunks should each thread process?
   int elems_per_thread = div_rounding_up(n, num_threads);
 
   int4 carry_in = mssp_mapf(0);
   for (int i = 0; i < elems_per_thread; i++) {
-    int j = elems_per_thread * get_group_id * group_size + i * group_size + ltid;
+    int j = elems_per_thread * gid * group_size + i * group_size + ltid;
 
     int4 x;
     if (j < n) {
@@ -80,7 +79,7 @@ kernel void chunked_mssp_stage_one(int n, global int *input, global int4 *output
   // The first thread writes its result, which is equivalent to the
   // result of the entire workgroup.
   if (ltid == 0) {
-    output[get_group_id(0)] = carry_in;
+    output[gid] = carry_in;
   }
 }
 
