@@ -93,6 +93,7 @@ void benchmark_tree_reduction(cl_context ctx, cl_command_queue queue, cl_device_
     time += event_runtime_us(events[i]);
     OPENCL_SUCCEED(clReleaseEvent(events[i]));
   }
+  free(events);
 
   printf("Tree reduction:  \t%dμs\n", time/runs);
 
@@ -156,6 +157,7 @@ void benchmark_group_reduction(cl_context ctx, cl_command_queue queue, cl_device
     time += event_runtime_us(events[i]);
     OPENCL_SUCCEED(clReleaseEvent(events[i]));
   }
+  free(events);
 
   printf("Group reduction:\t%dμs\n", time/runs);
 
@@ -222,6 +224,8 @@ void benchmark_chunked_reduction(cl_context ctx, cl_command_queue queue, cl_devi
     time += event_runtime_us(stage_two_events[i]);
     OPENCL_SUCCEED(clReleaseEvent(stage_two_events[i]));
   }
+  free(stage_one_events);
+  free(stage_two_events);
 
   printf("Chunked reduction:\t%dμs\n", time/runs);
 
@@ -276,6 +280,7 @@ void benchmark_atomic_reduction(cl_context ctx, cl_command_queue queue, cl_devic
     time += event_runtime_us(events[i]);
     OPENCL_SUCCEED(clReleaseEvent(events[i]));
   }
+  free(events);
 
   printf("Atomic reduction:\t%dμs\n", time/runs);
 

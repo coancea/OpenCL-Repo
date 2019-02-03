@@ -74,7 +74,7 @@ void benchmark_tree_mssp(cl_context ctx, cl_command_queue queue, cl_device_id de
   cl_program program = opencl_build_program(ctx, device, "kernels/tree_mssp.cl", "");
   cl_kernel tree_mssp_k = clCreateKernel(program, "tree_mssp", &error);
   OPENCL_SUCCEED(error);
-  cl_kernel mssp_init_k = clCreateKernel(program, "mssp_init", &error);
+  cl_kernel map_mssp_k = clCreateKernel(program, "map_mssp", &error);
   OPENCL_SUCCEED(error);
 
   cl_event *events = calloc(runs * (1+intlog(orig_n, 2)), sizeof(cl_event));
@@ -95,10 +95,10 @@ void benchmark_tree_mssp(cl_context ctx, cl_command_queue queue, cl_device_id de
     // First we have to construct the quadruples from the original input.
     size_t init_local_work_size[1] = { 256 };
     size_t init_global_work_size[1] = { div_rounding_up(n, init_local_work_size[0]) * init_local_work_size[0] };
-    clSetKernelArg(mssp_init_k, 0, sizeof(cl_int), &n);
-    clSetKernelArg(mssp_init_k, 1, sizeof(cl_mem), &mem_a);
-    clSetKernelArg(mssp_init_k, 2, sizeof(cl_mem), &mem_b);
-    OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, mssp_init_k, 1,
+    clSetKernelArg(map_mssp_k, 0, sizeof(cl_int), &n);
+    clSetKernelArg(map_mssp_k, 1, sizeof(cl_mem), &mem_a);
+    clSetKernelArg(map_mssp_k, 2, sizeof(cl_mem), &mem_b);
+    OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, map_mssp_k, 1,
                                           NULL, init_global_work_size, init_local_work_size,
                                           0, NULL, &events[events_created++]));
 
@@ -132,12 +132,12 @@ void benchmark_tree_mssp(cl_context ctx, cl_command_queue queue, cl_device_id de
   }
   OPENCL_SUCCEED(clFinish(queue));
 
-
   int time = 0;
   for (int i = 0; i < events_created; i++) {
     time += event_runtime_us(events[i]);
     OPENCL_SUCCEED(clReleaseEvent(events[i]));
   }
+  free(events);
 
   printf("Tree MSSP:      \t%dμs\n", time/runs);
 
@@ -158,7 +158,7 @@ void benchmark_group_mssp(cl_context ctx, cl_command_queue queue, cl_device_id d
   cl_program program = opencl_build_program(ctx, device, "kernels/group_mssp.cl", "");
   cl_kernel group_mssp_k = clCreateKernel(program, "group_mssp", &error);
   OPENCL_SUCCEED(error);
-  cl_kernel mssp_init_k = clCreateKernel(program, "mssp_init", &error);
+  cl_kernel map_mssp_k = clCreateKernel(program, "map_mssp", &error);
   OPENCL_SUCCEED(error);
 
   size_t group_size = 256;
@@ -180,10 +180,10 @@ void benchmark_group_mssp(cl_context ctx, cl_command_queue queue, cl_device_id d
     // First we have to construct the quadruples from the original input.
     size_t init_local_work_size[1] = { 256 };
     size_t init_global_work_size[1] = { div_rounding_up(n, init_local_work_size[0]) * init_local_work_size[0] };
-    clSetKernelArg(mssp_init_k, 0, sizeof(cl_int), &n);
-    clSetKernelArg(mssp_init_k, 1, sizeof(cl_mem), &mem_a);
-    clSetKernelArg(mssp_init_k, 2, sizeof(cl_mem), &mem_b);
-    OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, mssp_init_k, 1,
+    clSetKernelArg(map_mssp_k, 0, sizeof(cl_int), &n);
+    clSetKernelArg(map_mssp_k, 1, sizeof(cl_mem), &mem_a);
+    clSetKernelArg(map_mssp_k, 2, sizeof(cl_mem), &mem_b);
+    OPENCL_SUCCEED(clEnqueueNDRangeKernel(queue, map_mssp_k, 1,
                                           NULL, init_global_work_size, init_local_work_size,
                                           0, NULL, &events[events_created++]));
 
@@ -221,6 +221,7 @@ void benchmark_group_mssp(cl_context ctx, cl_command_queue queue, cl_device_id d
     time += event_runtime_us(events[i]);
     OPENCL_SUCCEED(clReleaseEvent(events[i]));
   }
+  free(events);
 
   printf("Group MSSP:     \t%dμs\n", time/runs);
 
@@ -290,6 +291,8 @@ void benchmark_chunked_mssp(cl_context ctx, cl_command_queue queue, cl_device_id
     time += event_runtime_us(stage_two_events[i]);
     OPENCL_SUCCEED(clReleaseEvent(stage_two_events[i]));
   }
+  free(stage_one_events);
+  free(stage_two_events);
 
   printf("Chunked MSSP:     \t%dμs\n", time/runs);
 
