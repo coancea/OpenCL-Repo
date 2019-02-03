@@ -580,6 +580,9 @@ int atomic_add(volatile __global int *p,
     code).
   \item The MSSP operator is \textit{not} commutative, so you will
     need to use a sliding window approach for the chunked reduction.
+  \item For the chunked reduction, you can fuse the \texttt{map}
+    function into the reduction itself.  For the others, a separate
+    pass is done.
   \end{itemize}
 
 \end{frame}

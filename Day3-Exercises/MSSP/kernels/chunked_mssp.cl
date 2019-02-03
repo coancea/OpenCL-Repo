@@ -12,20 +12,17 @@ int intmax(int y, int x) {
 
 int4 mssp_mapf(int x) {
   int4 v;
-  int x0 = intmax(x, 0);
-  v.s0 = x0;
-  v.s1 = x0;
-  v.s2 = x0;
-  v.s3 = 0;
+
+  // TODO: fill with initial values.
+
   return v;
 }
 
 int4 mssp_redf(int4 x, int4 y) {
   int4 r;
-  r.s0 = intmax(intmax(x.s0, y.s0), x.s2 + y.s1);
-  r.s1 = intmax(x.s1, x.s3 + y.s1);
-  r.s2 = intmax(x.s2 + y.s3, y.s2);
-  r.s3 = x.s3 + y.s3;
+
+  // TODO: combine x and y.
+
   return r;
 }
 
@@ -45,67 +42,22 @@ kernel void chunked_mssp_stage_one(int n, global int *input, global int4 *output
   for (int i = 0; i < elems_per_thread; i++) {
     int j = elems_per_thread * gid * group_size + i * group_size + ltid;
 
-    int4 x;
-    if (j < n) {
-      x = mssp_mapf(input[j]);
-    } else {
-      x = mssp_mapf(0);
-    }
-
-    // First thread in group also handles carry-in.
-    if (ltid == 0) {
-      x = mssp_redf(carry_in, x);
-    }
-
-    buf[ltid] = x;
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    // Then we perform a tree reduction within the workgroup.
-    for (int active = get_local_size(0)/2;
-         active >= 1;
-         active /= 2) {
-      if (ltid < active) {
-        buf[ltid] = mssp_redf(buf[ltid], buf[ltid+active]);
-      }
-      barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    if (ltid == 0) {
-      carry_in = buf[0];
-    }
+    // TODO: Each thread in the workgroup reads input[j] (if j < n,
+    // otherwise neutral element), applies the map function, and then
+    // perform a parallel reduction in local memory to reduce this to
+    // a single value.  That single value must then be kept as a
+    // "carry-in" by a *single* thread for the next iteration of the
+    // loop, and fed into the next reduction.  This is a subtle
+    // detail!
   }
 
-  // The first thread writes its result, which is equivalent to the
-  // result of the entire workgroup.
-  if (ltid == 0) {
-    output[gid] = carry_in;
-  }
+  // TODO: the first thread writes its result, which is equivalent to
+  // the result of the entire workgroup.
 }
 
 kernel void chunked_mssp_stage_two(int n, global int4 *input, global int4 *output,
                                    local int4 *buf) {
-  int gtid = get_global_id(0);
-  int ltid = get_local_id(0);
-
-  // Every thread fetches either an element of the input (if in
-  // bounds), or zero (if out of bounds).
-  buf[ltid] = gtid < n ? input[gtid] : 0;
-
-  barrier(CLK_LOCAL_MEM_FENCE);
-
-  // Then we perform a tree reduction within the workgroup.
-  for (int active = get_local_size(0)/2;
-       active >= 1;
-       active /= 2) {
-    if (ltid < active) {
-      buf[ltid] = mssp_redf(buf[ltid], buf[ltid+active]);
-    }
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-  }
-
-  if (ltid == 0) {
-    output[0] = buf[0];
-  }
+  // TODO: Just like in group reduction, each thread (<n) reads one
+  // element, a group-wide reduction takes place, and a single result
+  // is put in output[0].
 }

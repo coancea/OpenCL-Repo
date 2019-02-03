@@ -25,7 +25,7 @@ int4 mssp_redf(int4 x, int4 y) {
   return r;
 }
 
-kernel void mssp_init(int n, global int *input, global int4 *output) {
+kernel void map_mssp(int n, global int *input, global int4 *output) {
   int i = get_global_id(0);
 
   if (i < n) {
