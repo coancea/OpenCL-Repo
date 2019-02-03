@@ -50,6 +50,8 @@ OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
 
+void cleanUpBuffer(size_t buf_len, cl_mem buf);
+
 void initOclControl() {
     char    compile_opts[128];
     sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d -D NE=%d -D ElTp=%s",
@@ -256,6 +258,15 @@ void profileMemcpy() {
         printf("GPU memCpy Straight (Ideal) runs in: %ld microseconds on GPU; N: %d, GBytes/sec: %.2f\n",
                elapsed/RUNS_GPU, buffs.N, gigaBytesPerSec);
     }
+}
+
+void cleanUpBuffer(size_t buf_len, cl_mem buf) {
+    ElTp pattern = 0.0;
+    cl_int error = 
+        clEnqueueFillBuffer( ctrl.queue, buf, (void*)&pattern, sizeof(pattern),
+                             0, buf_len*sizeof(pattern), 0, NULL, NULL );
+    clFinish(ctrl.queue);
+    OPENCL_SUCCEED(error);
 }
 
 #endif //HELPER

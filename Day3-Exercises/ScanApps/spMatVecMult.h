@@ -238,7 +238,7 @@ void profileSpMatVectMul(SgmScanBuffs sgm_arrs, ElTp* cpu_matval) {
 
     {
         double microsecPerTransp = ((double)elapsed)/RUNS_GPU; 
-        double bytesaccessed = 3 * arrs.num_elems * sizeof(ElTp); // one read + one write
+        double bytesaccessed = 3 * arrs.num_elems * sizeof(ElTp); // two reads + one write
         double gigaBytesPerSec = (bytesaccessed * 1.0e-3f) / microsecPerTransp;
         printf("GPU SpMatVctMult runs in: %ld microseconds; N: %d; GBytes/sec: %.2f  ...",
                 elapsed/RUNS_GPU, num_elems, gigaBytesPerSec);
@@ -247,6 +247,8 @@ void profileSpMatVectMul(SgmScanBuffs sgm_arrs, ElTp* cpu_matval) {
     { // transfer result to CPU and validate
         gpuToCpuTransfer(arrs.num_rows, arrs.out, cpu_res);
         validate(cpu_ref, cpu_res, arrs.num_rows);
+        memset(cpu_res, 0, arrs.num_rows*sizeof(ElTp));
+        cleanUpBuffer(arrs.num_rows, arrs.out);
     }
 
     { // free CPU and GPU buffers allocated in this function

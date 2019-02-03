@@ -10,7 +10,7 @@ typedef int32_t     ElTp;
 #define WORKGROUP_SIZE      64
 #define MAX_WORKGROUP_SIZE  256 // for AMD, 1024 for NVIDIA
 #define NUM_GROUPS_SCAN     1024
-#define RUNS_GPU            200
+#define RUNS_GPU            75
 #define ELEMS_PER_THREAD    4
 
 /**
@@ -92,7 +92,7 @@ void testScanApps(const uint32_t N, ElTp *cpu_inp, uint8_t* cpu_flg, ElTp *cpu_r
     }
 
     // finally sparse-matrix vector multiplication
-    //profileSpMatVectMul(arrs, cpu_inp);
+    profileSpMatVectMul(arrs, cpu_inp);
 
     printf("\n");
 
@@ -115,7 +115,7 @@ int main() {
     testScanApps(N/512, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testScanApps(N/64, cpu_inp, cpu_flg, cpu_ref, cpu_out);
     testScanApps(N/8, cpu_inp, cpu_flg, cpu_ref, cpu_out);
-    testScanApps(N, cpu_inp, cpu_flg, cpu_ref, cpu_out);
+    testScanApps(N/2, cpu_inp, cpu_flg, cpu_ref, cpu_out);
 
     freeOclControl();
     free(cpu_inp);

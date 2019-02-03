@@ -113,8 +113,11 @@ Applies a function to every element of the input array producing an array of equ
 X = & \emph{map}(~f, ~ [& $a_1$, & $a_2$, & .., & $a_n$ & ])\\
     &      & $\downarrow$ & $\downarrow$ &  & $\downarrow$ & &\\
 X $\equiv$ &  [  & \emph{f($a_1$)}, & \emph{f($a_2$)}, & .., & \emph{f($a_n$)} & ] &
-\end{tabular}
-\bigskip\pause
+\end{tabular}\bigskip
+
+\begin{scriptsize}
+Similar: {\tt~~~~map2(f,[$a_1$,$\ldots$,$a_n$],[$b_1$,$\ldots$,$b_n$]) $\equiv$ [f($a_1$,$b_1$),$\ldots$,f($a_n$,$b_n$)]} 
+\end{scriptsize}\\\bigskip\pause
 
 \emp{Map Fusion:} \emph{{\tt~~~map(f, map(g, A))} $~\equiv~$ {\tt map(f o g, A)}} \bigskip
 
@@ -126,7 +129,7 @@ X = map(g, A) & $\equiv$ & [ & g($a_1$), &g($a_2$), &$\ldots$, &g($a_n$) &]\\
 \end{tabular}
 \bigskip
 
-Fusion is one of the most important optimizations, as it saves bandwidth!
+Fusion is a very important optimizations; saves bandwidth!
 
 \end{frame}
 
@@ -368,7 +371,7 @@ We need to compute extra information:\pause
 \includegraphics[height=22ex]{img/day3/mssp2}
 \medskip
 Lets compute the {\tt mis}, {\tt mcs}, {\tt mss}, and {\tt ts} for
-the result of the two concatenating segments.
+the result of the two concatenating segments. $\uparrow$ denotes {\tt max}.
 
 \bigskip
 {\tt mis = \pause mis1 $\uparrow$ (ts1 + mis2)}
@@ -540,10 +543,10 @@ Output: B = [a\mymath{\myindx{1}}, a\mymath{\myindx{1}}\mymath{\oplus}a\mymath{\
 
 \end{frame}
 
-\subsection{Exercise 2: Intra-Wave Scan Implementation}
+\subsection{Exercise 2: Intra-Wave Inclusive Scan Implementation}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 2: Intra-Wave Scan Implementation}
+  \frametitle{Exercise 2: Intra-Wave Inclusive Scan Implementation}
 
 \begin{columns}
 \column{0.46\textwidth}
@@ -617,7 +620,7 @@ partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 3, Step 1: Partition2 High-Level Implementation}
+  \frametitle{Exercise 3, Step 1: Partition2 High-Level Implem}
 
 \begin{colorcode}
 bool odd(int v) \{ return (bool)(v & 1); \}
@@ -635,18 +638,19 @@ TODO: Cosmin needs to write the implementation in a more imperative style!
 let partition2 [n] (X : [n]i32) : 
               ([n]i32, [n]i32) =
  let cs = map cond X
- let tfs= map (\mymath{\lambda}f->if f then 1 
-                        else 0) cs
- let isT= scan (+) 0 tfs
+ let tfs= map (\mymath{\lambda}c->if c then 1 
+                        else 0,  cs)
+ let isT= scan( (+), 0, tfs_
  let i  = isT[n-1]
 
- let ffs= map (\mymath{\lambda}f->if f then 0 
-                        else 1) cs
- let isF= map (+i) (scan (+) 0 ffs)
- let inds=map (\mymath{\lambda}(c,iT,iF) -> 
+ let ffs= map (\mymath{\lambda}c->if c then 0 
+                        else 1,  cs )
+ let tmps = scan( (+), 0, ffs)
+ let isF= map (\mymath{\lambda}t -> t+i) tmps
+ let inds=map3(\mymath{\lambda}(c,iT,iF) -> 
                   if c then iT-1 
                        else iF-1
-              ) (zip cs isT isF)
+              , cs, isT, isF)
  let res = scatter (scratch n) inds X
  in (i, res)
 \end{colorcode}

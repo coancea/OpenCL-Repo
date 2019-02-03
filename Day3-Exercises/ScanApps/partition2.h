@@ -106,6 +106,7 @@ void profilePartition(PartitionBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
+        cleanUpBuffer(arrs.N, arrs.out);
     }
 }
 

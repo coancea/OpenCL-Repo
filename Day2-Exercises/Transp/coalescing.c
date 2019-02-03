@@ -183,6 +183,7 @@ void runGPUverTransp(TranspVers kind, real* hB, real* hdB) {
         gpuToCpuTransfer(N, hdB);
         validate(hB, hdB, N);
         memset(hdB, 0, N*sizeof(real));
+        cleanUpBuffer(N, buffs.dB);
     }
 }
 
@@ -227,6 +228,7 @@ void timeGPUnaive_or_optProgram(ProgrmVers vers, real* hB, real* hdB) {
         gpuToCpuTransfer(N, hdB);
         validate(hB, hdB, N);
         memset(hdB, 0, N*sizeof(real));
+        cleanUpBuffer(N, buffs.dB);
     }
 }
 

@@ -127,6 +127,7 @@ void runGPUverMMM(Version kind, real* hC, real* hdC) {
         gpuToCpuTransfer(N, hdC);
         validate(hC, hdC, N);
         memset(hdC, 0, N*sizeof(real));
+        cleanUpBuffer(N, buffs.dC);
     }
 } 
 
