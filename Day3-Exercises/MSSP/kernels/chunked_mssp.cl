@@ -105,9 +105,7 @@ kernel void chunked_mssp_stage_two(int n, global int4 *input, global int4 *outpu
     barrier(CLK_LOCAL_MEM_FENCE);
   }
 
-  // The first thread writes its result, which is equivalent to the
-  // result of the entire workgroup.
   if (ltid == 0) {
-    output[get_group_id(0)] = buf[0];
+    output[0] = buf[0];
   }
 }

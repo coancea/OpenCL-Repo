@@ -320,8 +320,9 @@ int main(int argc, char** argv) {
 
   cl_int *input = calloc(n, sizeof(cl_int));
 
+  srand(123);
   for (int i = 0; i < n; i++) {
-    input[i] = i;
+    input[i] = rand() % 100 - 50;
   }
 
   cl_int error;
