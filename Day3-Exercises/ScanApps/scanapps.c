@@ -4,8 +4,8 @@
 typedef int32_t     ElTp;
 #define ElTp_STR    "int32_t"
 #define NE          0
-#define lgWARP      6
-#define WARP        (1<<lgWARP)
+#define lgWAVE      6
+#define WAVE        (1<<lgWAVE)
 
 #define WORKGROUP_SIZE      64
 #define MAX_WORKGROUP_SIZE  256 // for AMD, 1024 for NVIDIA

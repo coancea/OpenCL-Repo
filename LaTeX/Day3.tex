@@ -703,7 +703,37 @@ Output: B = [a\mymath{\myindx{1}}, a\mymath{\myindx{1}}\mymath{\oplus}a\mymath{\
 \end{columns}
 
 \begin{itemize}
-    \item TODO: Cosmin should write exercise description here!!!
+    \item Open file "scanapps.cl", and implement function named "incScanWave" (follow the instructions)
+    \item Your {\tt n = WAVE} and {\tt k = lgWAVE}; Ignore the init. loop;
+    \item Unroll the {\tt for d} loop ({\tt \#pragma unroll});
+    \item loop {\tt forall i = h to n-1} is implicit,
+    \item it should be replace by a condition {\tt if (i>=h) \{ ... \}},
+    \item except that {\tt i} is not exactly the thread id.
+    \item Remember, you want to {\tt scan} each wave, independently!
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{OpenCL Scan Implementation}
+
+    BLACKBOARD!
+
+\begin{itemize}
+    \item CPU stub is in {\tt Day3-Exercises/ScanApps/scan.h}
+    \item Hierarchical design:
+    \item[1] sequentially scan {\tt ELEMS\_PER\_THREAD} by each thread,
+    \item[2] publish in local memory
+    \item[3] scan at wavefront level
+    \item[4] ``update'' the scan at workgroup level
+    \item[5] Gather the last elements in the scan groups into
+             a separate array, and scan that!
+    \item[5] Virtualize steps [1-4] so that the scan at step 5 fits
+             into one workgroup;
+    \item[6] add element {\tt i-1} of the result of step 5 
+                to each element of workgroup {\tt i} resulted from step $4$!
+    \item \red{This requires $2$ reads and $2$ writes from/to global memory.}\\
+          \emphh{Can you do it better?}
 \end{itemize}
 
 \end{frame}
@@ -727,6 +757,9 @@ X (input array)    {\tt~=[a0,~a1,~a2,~a3,~a4,~a5]}\\
 
 \emph{scatter} has $D(n)=\Theta(1)$ and $W(n)=\Theta(n)$,\\
 i.e., requires {\tt n} update operations ({\tt n} is the size of I or A, not of X!).\bigskip
+\bigskip
+
+{\bf replicate(n, v)} creates an array of length {\tt n} filled with element {\tt v}!
 
 \end{frame}
 
@@ -745,9 +778,9 @@ Partition2 receives as input a predicate and an array and results in:
 \end{itemize}\bigskip
 
 \begin{colorcode}
-bool odd(int v) \{ return (bool)(v & 1); \}
-partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
-             (3, [5, 3, 7, 4, 2, 10, 8])
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
 \end{colorcode}
 
 \end{frame}
@@ -756,56 +789,53 @@ partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
   \frametitle{Exercise 3, Step 1: Partition2 High-Level Implem}
 
 \begin{colorcode}
-bool odd(int v) \{ return (bool)(v & 1); \}
-partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
-             (3, [5, 3, 7, 4, 2, 10, 8])
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
 \end{colorcode}
 
-Step 1: implement partition2 based on map, scan and scatter (?)\pause
-
-TODO: Cosmin needs to write the implementation in a more imperative style!
+Step 1: implement partition2 based on map, scan and scatter (?)\bigskip
 
 \begin{columns}
 \column{0.59\textwidth}
 \begin{colorcode}
-let partition2 [n] (X : [n]i32) : 
-              ([n]i32, [n]i32) =
- let cs = map cond X
- let tfs= map (\mymath{\lambda}c->if c then 1 
-                        else 0,  cs)
- let isT= scan( (+), 0, tfs_
- let i  = isT[n-1]
+partition2(X: [n]i32): (i32, [n]i32) =
+ cs = map(even, X);
+ tfs= map (\mymath{\lambda}c->if c then 1 else 0
+          ,  cs);\pause
+ isT= scan( (+), 0, tfs );
+ i  = isT[n-1];
 
- let ffs= map (\mymath{\lambda}c->if c then 0 
-                        else 1,  cs )
- let tmps = scan( (+), 0, ffs)
- let isF= map (\mymath{\lambda}t -> t+i) tmps
- let inds=map3(\mymath{\lambda}(c,iT,iF) -> 
-                  if c then iT-1 
-                       else iF-1
-              , cs, isT, isF)
- let res = scatter (scratch n) inds X
- in (i, res)
+ ffs= map (\mymath{\lambda}c->if c then 0 else 1
+          ,  cs );
+ tmps = scan( (+), 0, ffs );
+ isF= map (\mymath{\lambda}t -> t+i, tmps);
+
+ inds=map3(\mymath{\lambda}(c,iT,iF) -> 
+              if c then iT-1 else iF-1
+          , cs, isT, isF);
+ res = scatter(scratch n, inds, X);
+ return (i, res);
 \end{colorcode}
 \column{0.4\textwidth}\vspace{-2ex}
 \begin{colorcode}[fontsize=\scriptsize]
-Assume X = [5,4,2,3,7,8], and 
-cond is T(rue) for even nums.\pause
-n   = 6
-cs  = [F, T, T, F, F, T]
-tfs = [0, 1, 1, 0, 0, 1]
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{n   = 7}
+\emp{cs  = [F, T, T, T, F, F, T]}
+\emp{tfs = [0, 1, 1, 1, 0, 0, 1]}
 
-isT = [0, 1, 2, 2, 2, 3]
-i   = 3
+\emp{isT = [0, 1, 2, 3, 3, 3, 4]}
+\emp{i   = 4}
 
-ffs = [1, 0, 0, 1, 1, 0]
-isF = [4, 4, 4, 5, 6, 6]
+\emp{ffs = [1, 0, 0, 0, 1, 1, 0]}
+\emp{tmps= [1, 1, 1, 1, 2, 3, 3]}
+\emp{isF = [5, 5, 5, 5, 6, 7, 7]}
 
-inds= [3, 0, 1, 4, 5, 2]
-
-
-flags  = [3, 0, 0, 3, 0, 0]
-Result = [4, 2, 8, 5, 3, 7] 
+\emp{inds= [4, 0, 1, 2, 5, 6, 3]}
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{Res = [_, _, _, _, _, _, _]}
+\emp{---------------------------}
+\emp{Res = [4, 2, 10, 8,5, 3, 7]} 
 \end{colorcode}
 \end{columns}
 
@@ -819,7 +849,17 @@ Result = [4, 2, 8, 5, 3, 7]
   \frametitle{Exercise 3: Implement Partition2 in OpenCL}
 
 \begin{itemize}
-    \item TODO: Cosmin should write the exercise description here!!!
+    \item CPU stub is {\tt Day3-Exercises/ScanApps/partition2.h}, 
+            function {\tt runPartition}, but nothing to do there!\bigskip
+    \item[(1)] In {\tt Day3-Exercises/ScanApps/scanapps.cl}, implement
+             from scratch kernel {\tt mapPredPartKer} which is supposed 
+             to compute {\tt tfs} and {\tt ffs}.\bigskip
+    \item[(2)] the two scans are already implemented for you!\bigskip
+    \item[(3)] Then implement kernel {\tt scatterPartKer} which is supposed
+             to compute the last part! Note that {\tt isT} and {\tt isF}
+             are the results of {\tt scan}, i.e., {\tt isF} is actually {\tt tmps}
+             in slides!\\
+             It is Ok to redundantly compute the condition again.
 \end{itemize}
 
 \end{frame}
@@ -968,9 +1008,148 @@ Tup \mymath{\odot\myindu{sgm}}(Tup x, Tup y) \{
 \subsection{Application: Sparse Matrix-Vector Multiplication}
 
 \begin{frame}[fragile,t]
+  \frametitle{Sparse Matrix-Vector Multiplication: Pseudocode}
+
+\begin{colorcode}[fontsize=\scriptsize]
+smvMul( mat_cols: [N]int, mat_vals: [N]real
+      , vct: [vct_len], shape: [num_rows]int ) : [num_rows]real =
+  real res_vct[num_rows];
+  int  offset = 0;
+  for(int i=0; i < num_rows; i++) \{
+    real res = 0;
+    \emp{for(int j=offset; j < offset+shape[i]; j++) \{}
+        int vct_ind = mat_cols[j];
+        int mat_elm = mat_vals[j];
+        res += mat_elm * vct[vct_ind];
+    \}
+    res_vct[i] = res;
+    offset += shape[i];
+  \}
+\end{colorcode}
+
+\bigskip
+
+\begin{colorcode}[fontsize=\scriptsize]
+shape:    [2, 3, 1]
+mat_cols: [0,    1,    1,   2,    3,   3  ]
+mat_vals: [2.0, -1.0, -1.0, 2.0, -1.0, 3.0]
+vct:      [1.0,  2.0,  3.0, 4.0]
+-------------------------------------------\pause
+Result: 
+[ 2.0*1.0 + (-1.0)*2.0               = 0.0
+, (-1.0)*2.0 + 2.0*3.0 + (-1.0)*4.0  = 0.0
+, 3.0*4.0                            = 12.0
+]
+\end{colorcode}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
   \frametitle{Sparse Matrix-Vector Multiplication}
 
-TODO: COSMIN should continue here!!!
+Imperative Pseudocode:
+\begin{colorcode}[fontsize=\scriptsize]
+smvMul( mat_cols: [N]int, mat_vals: [N]real
+      , vct: [vct_len], shape: [num_rows]int ) : [num_rows]real =
+  real res_vct[num_rows];
+  int  offset = 0;
+  for(int i=0; i < num_rows; i++) \{
+    real res = 0;
+    \emp{for(int j=offset; j < offset+shape[i]; j++) \{}
+        int vct_ind = mat_cols[j];
+        int mat_elm = mat_vals[j];
+        res += mat_elm * vct[vct_ind];
+    \}
+    res_vct[i] = res;
+    offset += shape[i];
+  \}
+\end{colorcode}
+
+
+We would like to:
+\begin{itemize}
+    \item exploit all parallelism, \emp{but the inner parallelism is irregular!}
+    \item the inner loop:\pause looks like a map-reduce composition,\\
+            buts its size is variant to the outer {\tt map};
+    \item Hint: compute flags + use segmented scan + extract last elements! 
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Computing Flag Array from Shape Array}
+
+This works even in the presence of empty rows!\bigskip
+
+\begin{columns}
+\column{0.59\textwidth}
+\begin{colorcode}
+mkFlagArray (aoa_shp: [m]i32) : []i32 =
+  shp_rot = map (\mymath{\lambda}i->if i==0 then 0
+                      else aoa_shp[i-1]
+                , [0,...,m-1]);
+  shp_scn = scan( (+), 0, shp_rot );
+  aoa_len = shp_scn[m-1] + aoa_shp[m-1];
+  shp_ind = map2 (\mymath{\lambda}shp ind ->
+                   if shp==0 then -1
+                             else ind
+                 , aoa_shp, shp_scn);
+  return 
+    scatter( replicate(aoa_len, 0)
+           , shp_ind
+           , replicate(m, 1) );
+\end{colorcode}
+\column{0.4\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+\emp{aoa_shp=[0,3,1,0,4,2,0]}\pause
+\emp{shp_rot=[0,0,3,1,0,4,2]}\pause
+
+\emp{shp_scn=[0,0,3,4,4,8,10]}\pause
+\emp{aoa_len= 10}
+
+\emp{shp_ind=} \pause
+      \emp{[-1,0,3,-1,4,8,-1]}
+\emp{scatter}\pause
+  \emp{[0,0,0,0,0,0,0,0,0,0]}
+  \emp{[-1,0,3,-1,4,8,-1]}
+  \emp{[1,1,1,1,1,1,1]}
+  \emp{---------------------}
+  \emp{[1,0,0,1,1,0,0,0,1,0]}
+\end{colorcode}
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Flat-Parallel Sparse Matrix-Vector Mult}
+
+\emphh{Idea: use segmented scan, then extract last element in every row!}\\
+We assume no rows of length 0, and also inline flag computation.
+
+\begin{colorcode}
+smvMul( mat_cols: [N]int       \emp{// [0,    1,    1,   2,    3,   3  ]}
+      , mat_vals: [N]real      \emp{// [2.0, -1.0, -1.0, 2.0, -1.0, 3.0]}
+      , vct: [vct_len]         \emp{// [1.0,  2.0,  3.0, 4.0]}
+      , shape: [num_rows]int ) \emp{// [2,    3,    1]}
+      : [num_rows]real =       \emp{// Expected: [0.0, 0.0, 12.0]}
+  \blue{shpscn= scan( (+), 0, shape );}       \emp{// [2, 5, 6]}
+  \emphh{len   = shpscn[num_rows-1];}
+  \emphh{ones  = replicate(num_rows, 1);}      \emp{// [1, 1, 1]}
+  \emphh{indm1 = map(\mymath{\lambda} i -> if i==0 then 0}
+                     \emphh{else shpscn[i-1]}
+                    \emphh{, [0...num_rows]);} \emp{// [0, 2, 5]}
+  \emphh{flags = scatter( replicate(len, 0)}   \emp{// [0, 0, 0, 0, 0, 0]}
+                 \emphh{, indm1}              
+                 \emphh{, ones );}     \emp{// [1,    0,    1,   0,    0,   1  ]}
+  \red{prods = map2(\mymath{\lambda}col v ->}       \emp{// [2.0, -2.0, -2.0, 6.0, -4.0, 12.0]} 
+                    \red{v * vct[col]} 
+              \red{, mat_cols, mat_vals );}
+  \orange{scnarr= sgmScan\mymath{\myindu{inc}}( (+), 0}
+              \orange{, flags, prods);} \emp{// [2.0, 0.0, -2.0, 4.0, 0.0, 12.0]}\pause
+  return                       \emp{// [scnarr[1], scn_arr[4], scn_arr[5]]}
+    \purple{map(\mymath{\lambda} ind -> scnarr[ind-1];}
+       \purple{, shpscn );}             \emp{// [0.0, 0.0, 12.0]}
+\end{colorcode}
 
 \end{frame}
 
@@ -979,7 +1158,20 @@ TODO: COSMIN should continue here!!!
 \begin{frame}[fragile,t]
   \frametitle{Exercise 4: Sparse Matrix-Vector Mult in OpenCL}
 
-TODO: COSMIN should continue here!!!
+\begin{itemize}
+    \item the CPU stub is in {\tt Day3-Exercises/ScanApps/spMatVecMult.h}, function {\tt runSpMatVectMul};
+            nothing to do there! You only need to implement several kernels in {\tt scanapps.cl}.\smallskip
+    \item[(1)] \blue{\tt shpscn= scan( (+), 0, shape );}\\ is already implemented!
+    \item[(2)] \emphh{Implement kernel {\tt mkFlagsSpMVM}.} Array {\tt flags} has been already zeroed;
+                {\tt shape\_scn} is {\tt shpscn} in the previous slide.\smallskip
+    \item[(3)] \red{Implement kernel {\tt mulPhaseSpMVM}.}\\ 
+                {\tt mat\_ind} is {\tt mat\_cols} from the previous slide.\smallskip
+    \item[(4)] \orange{\tt scnarr= sgmScan\mymath{\myindu{inc}}( (+), 0, flags, prods);}\\
+            is already implemented!\smallskip
+    \item[(5)] \purple{Implement kernel{\tt getLastSpMVM}.}\\ {\tt shape\_scn} and
+                {\tt sgm\_mat} are {\tt shpscn} and {\tt scnarr} in previous slide,
+                respectively, and {\tt out} is the result. 
+\end{itemize}
 
 \end{frame}
 
