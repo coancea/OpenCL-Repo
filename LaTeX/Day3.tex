@@ -2,6 +2,7 @@
 
 \usepackage{paratype}
 \setbeamerfont{frametitle}{family=\bf}
+\usepackage{listings}
 
 % Beamer theme settings
 \usecolortheme{seagull}
@@ -448,7 +449,139 @@ fuse the {\tt map} with the {\tt reduce} operations.
 \begin{frame}[fragile,t]
   \frametitle{Exercise 1: OpenCL Implementation of MSSP}
 
-Troels should add description here of what does he want the students to do!
+  \begin{itemize}
+  \item For this exercise, you will implement MSSP as an OpenCL program.
+  \item As inspiration, we will first study four OpenCL
+    implementations of \textit{summing an integer array}.
+  \end{itemize}
+
+\huge
+  \[
+    \sum_{i < n} x[i]
+  \]
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Binary Tree Reduction}
+
+  \textbf{The idea:} each thread reads two neighbouring elements, adds
+  them together, and writes one element.  This halves the array in
+  size.  Continue until only a single element is left.
+
+\begin{center}
+  \includegraphics[height=20ex]{img/day3/ReduceEg.pdf}
+\end{center}
+
+\begin{itemize}
+\item Each level becomes a kernel invocation, with number of threads
+  equal to half the number of array elements.
+\item $O(n)$ work and $O(\log(n))$ span (optimal).
+\item \textbf{Why is this not efficient?}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Improving the Tree Reduction}
+
+  \textbf{The idea:} instead of shrinking the array by a factor of two
+  for each level, shrink it by the workgroup size.
+
+  \begin{itemize}
+  \item Same asymptotic performance.
+  \item Avoids kernels with very few threads.  E.g with workgroup size
+    $256$: $10000000 \rightarrow 39063 \rightarrow 153 \rightarrow 1$.
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Applying Brent's Lemma}
+
+  \textbf{The idea:} instead of letting the thread count depend on the
+  input size, always launch the same number of threads, and have each
+  thread perform an efficient sequential summation of a \textit{chunk}
+  of the input.
+
+  \begin{itemize}
+  \item GPUs have a maximum (hardware/problem-dependent) capacity for
+    exploiting parallelism.  Beyond that limit, parallelism is at best
+    worthless, and usually comes with overhead (e.g. excessive
+    synchronisation).
+  \item \textit{A straightforward implementation of this idea only
+      works if the operator is commutative!}
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+    Chunked reduction & $70\mu{}s$ & $103\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Using Atomics}
+
+  \textbf{The idea:} GPUs have special hardware support for performing
+  certain memory updates atomically.  In OpenCL, this is exposed
+  through \textit{atomic operations}.
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+int atomic_add(volatile __global int *p,
+               int val)
+\end{lstlisting}
+
+  \begin{itemize}
+  \item Concise parallel reduction: each thread reads an element and
+    uses \texttt{atomic\_add()} to update the same location in memory.
+  \item \textbf{Why is this slow for large inputs?}
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+    Chunked reduction & $70\mu{}s$ & $103\mu{}s$ \\
+    Atomics & $8\mu{}s$ & $1278\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{For MSSP}
+
+  Implement three versions:
+
+  \begin{enumerate}
+  \item Tree reduction
+  \item Group reduction
+  \item Chunked reduction
+  \end{enumerate}
+
+  \textbf{Hints:}
+  \begin{itemize}
+  \item Instead of a \texttt{struct Qtup}, you may want to use
+    \texttt{int4} (inside the kernels) and \texttt{cl\_int4} (in host
+    code).
+  \item The MSSP operator is \textit{not} commutative, so you will
+    need to use a sliding window approach for the chunked reduction.
+  \end{itemize}
+
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -852,3 +985,8 @@ TODO: COSMIN should continue here!!!
 
 
 \end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
