@@ -311,15 +311,17 @@ int main(int argc, char** argv) {
   cl_int correct, output;
   benchmark_sequential_reduction(n, input, &correct);
 
-  // Create memory here (and fill them with data) to ensure they are
-  // not first faulted onto the device when the first kernel is
-  // executed.
-  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                n*sizeof(cl_int), input, &error);
+  // Create memory here.  For easier correct functioning of the
+  // chunked reduction kernel, we make these buffers at minimum 1MiB
+  // in size.
+  int k = 1024*1024 + n;
+
+  cl_mem mem_a = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
+                                k*sizeof(cl_int), NULL, &error);
   OPENCL_SUCCEED(error);
 
-  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                n*sizeof(cl_int), input, &error);
+  cl_mem mem_b = clCreateBuffer(ctx, CL_MEM_READ_WRITE,
+                                k*sizeof(cl_int), NULL, &error);
   OPENCL_SUCCEED(error);
 
   OPENCL_SUCCEED(clFinish(queue));
