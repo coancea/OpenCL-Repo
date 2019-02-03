@@ -32,7 +32,6 @@ kernel void chunked_reduction(int n, global elem_t *input, global elem_t *output
     if (ltid < active) {
       buf[ltid] = buf[ltid] + buf[ltid+active];
     }
-
     barrier(CLK_LOCAL_MEM_FENCE);
   }
 
