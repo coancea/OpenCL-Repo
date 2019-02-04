@@ -45,11 +45,12 @@ kernel void group_mssp(int n, global int4 *input, global int4 *output,
   barrier(CLK_LOCAL_MEM_FENCE);
 
   // Then we perform a tree reduction within the workgroup.
-  for (int active = get_local_size(0)/2;
-       active >= 1;
-       active /= 2) {
-    if (ltid < active) {
-      buf[ltid] = mssp_redf(buf[ltid], buf[ltid+active]);
+  for (int skip = 1;
+       skip < get_local_size(0);
+       skip *= 2) {
+    int offset = skip;
+    if ((ltid & (2 * skip - 1)) == 0) {
+      buf[ltid] = mssp_redf(buf[ltid], buf[ltid+offset]);
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
