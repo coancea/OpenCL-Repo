@@ -71,7 +71,7 @@ to global memory by means of transposition.
     -- then optimize it further by fusing the transposition inside the
 program.
 
-### DAY 3
+### DAY 3 ([slides](Day3.pdf))
 
 I. Lecture 9:00 - 12:00:
 
