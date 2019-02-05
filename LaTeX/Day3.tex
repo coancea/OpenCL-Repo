@@ -1178,6 +1178,142 @@ smvMul( mat_cols: [N]int       \emp{// [0,    1,    1,   2,    3,   3  ]}
 
 \end{frame}
 
+\section{Optimized Partition2}
+
+\begin{frame}
+  \tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Back To Partition2}
+
+\begin{columns}
+\column{0.59\textwidth}
+\begin{colorcode}
+partition2(X: [n]i32): (i32, [n]i32) =
+ cs = map(even, X);
+ tfs= map (\mymath{\lambda}c->if c then 1 else 0
+          ,  cs);
+ isT= scan( (+), 0, tfs );
+ i  = isT[n-1];
+
+ ffs= map (\mymath{\lambda}c->if c then 0 else 1
+          ,  cs );
+ tmps = scan( (+), 0, ffs );
+ isF= map (\mymath{\lambda}t -> t+i, tmps);
+
+ inds=map3(\mymath{\lambda}(c,iT,iF) -> 
+              if c then iT-1 else iF-1
+          , cs, isT, isF);
+ res = scatter(scratch n, inds, X);
+ return (i, res);
+\end{colorcode}
+\column{0.4\textwidth}\vspace{-2ex}
+\begin{colorcode}[fontsize=\scriptsize]
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{n   = 7}
+\emp{cs  = [F, T, T, T, F, F, T]}
+\emp{tfs = [0, 1, 1, 1, 0, 0, 1]}
+
+\emp{isT = [0, 1, 2, 3, 3, 3, 4]}
+\emp{i   = 4}
+
+\emp{ffs = [1, 0, 0, 0, 1, 1, 0]}
+\emp{tmps= [1, 1, 1, 1, 2, 3, 3]}
+\emp{isF = [5, 5, 5, 5, 6, 7, 7]}
+
+\emp{inds= [4, 0, 1, 2, 5, 6, 3]}
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{Res = [_, _, _, _, _, _, _]}
+\emp{---------------------------}
+\emp{Res = [4, 2, 10, 8,5, 3, 7]} 
+\end{colorcode}
+\end{columns}
+\bigskip
+
+This shows you how to think about it, but a direct 
+implementation is not very efficient in practice.
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Partition2: Taking Inspiration From Scan}
+
+\begin{colorcode}
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
+\end{colorcode}
+
+A scan implementation is typically split into three kernels:\medskip
+\begin{itemize}
+    \item[(1)] reduce at workgroup level (with sequential chunking);\medskip
+    \item[(2)] scan the results of (1) in one workgroup; this is typically
+                negligible, as it is applied on few elements;\medskip
+    \item[(3)] perform the workgroup level scan while starting from the
+                result of the previous workgroup.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Partition2: Deriving an Optimized Implementation}
+
+\begin{colorcode}
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
+\end{colorcode}
+\smallskip
+
+\begin{scriptsize}
+\begin{itemize}
+    \item[(I)] map-reduce at workgroup level; operator is commutative!
+        \begin{itemize}
+           \item[(a)] \begin{scriptsize}{\tt X = map($\lambda$(e)-> if pred(e) then (1,0) else (0,1), A);}
+                      \end{scriptsize}
+           \item[(b)] \begin{scriptsize}{\tt reduce$^{wkgp}$($\lambda$((a1,b1),(a2,b2))->(a1+b2, b1+b2)),(0,0),X);}
+                      \end{scriptsize}
+        \end{itemize}\smallskip
+    \item[(II)] scan the results of (I) in one workgroup; after this step we know 
+                the global offsets of the elements that succeed/fail at the start
+                of each workgroup.\smallskip
+    \item[(III)] Do all the rest in one kernel:
+        \begin{itemize}
+        \begin{scriptsize}
+            \item[(1)] Copy {\tt ELEMS\_PER\_THREAD} from global to local memory, coalesced (ToDo).\smallskip
+            \item[(2)] Save them in per-thread register memory ({\tt chunk}) +\\
+                        Reduce sequentially each thread's {\tt ELEMS\_PER\_THREAD}
+                        elems in {\tt tf}; (ToDo).\smallskip
+            \item[(3)] Perform workgroup-level scan on the {\tt tf} of each thread (DONE).\smallskip
+            \item[(4)] The number of elements that succeed/fail per workgroup 
+                        ({\tt num\_ts/num\_fs}) is the last scanned element (DONE).\smallskip
+            \item[(5)] Save in {\tt tf} the result of the previous thread (DONE).\smallskip
+            \item[(6)] Redo computation (2) but instead place the elements from 
+                        register to local memory in the order in which they would occur
+                        if the partition was done at workgroup level; remember to add 
+                        {\tt num\_ts} to the failed-elems index (ToDo).\smallskip
+            \item[(7)] Finally copy-out from local to global memory in coalesced fashion (DONE).
+        \end{scriptsize}
+        \end{itemize}
+\end{itemize}
+\end{scriptsize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Last Exercise: Optimized Partition2}
+
+\begin{itemize}
+    \item CPU stub: in file {\tt Day3-Exercises/Partition2Opt/partition2.h}, function {\tt runPartition};
+            that is where the OpenCL kernels are called, but nothing to do there.\bigskip
+
+    \item Open in file {\tt Day3-Exercises/Partition2Opt/kernels.cl}, kernel {\tt scanPhaseKer}. 
+            Follow the instructions, which correspond to implementing the ToDo items from
+            the previous slide.\bigskip
+
+    \item The performance of the optimized partition2 should come close to that of inclusive scan!
+\end{itemize}
+
+\end{frame}
 
 \end{document}
 

@@ -36,8 +36,8 @@ PartitionBuffs buffs;
 
 void initOclControl() {
     char    compile_opts[128];
-    sprintf(compile_opts, "-D lgWARP=%d -D ELEMS_PER_THREAD=%d -D NE=%d -D ElTp=%s",
-            lgWARP, ELEMS_PER_THREAD, NE, ElTp_STR);
+    sprintf(compile_opts, "-D lgWAVE=%d -D ELEMS_PER_THREAD=%d -D NE=%d -D ElTp=%s",
+            lgWAVE, ELEMS_PER_THREAD, NE, ElTp_STR);
     
     //opencl_init_command_queue(0, GPU_DEV_ID, &ctrl.device, &ctrl.ctx, &ctrl.queue);
     opencl_init_command_queue_default(&ctrl.device, &ctrl.ctx, &ctrl.queue);
@@ -140,6 +140,15 @@ void validate(ElTp* A, ElTp* B, uint32_t sizeAB){
     printf("VALID RESULT!\n");
 }
 
+void cleanUpBuffer(size_t buf_len, cl_mem buf) {
+    ElTp pattern = 0;
+    cl_int error = 
+        clEnqueueFillBuffer( ctrl.queue, buf, (void*)&pattern, sizeof(pattern),
+                             0, buf_len*sizeof(pattern), 0, NULL, NULL );
+    clFinish(ctrl.queue);
+    OPENCL_SUCCEED(error);
+}
+
 /************************/
 /*** Partition2 Fused ***/
 /************************/
@@ -240,6 +249,7 @@ void profilePartition(PartitionBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
+        cleanUpBuffer(arrs.N, arrs.out);
     }
 }
 
