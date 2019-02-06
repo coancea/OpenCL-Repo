@@ -57,7 +57,6 @@ kernel void chunked_mssp_stage_one(int n, global int *input, global int4 *output
 
 kernel void chunked_mssp_stage_two(int n, global int4 *input, global int4 *output,
                                    local int4 *buf) {
-  // TODO: Just like in group reduction, each thread (<n) reads one
-  // element, a group-wide reduction takes place, and a single result
-  // is put in output[0].
+  // TODO: Just like chunked_mssp_stage_one, except that there is no
+  // need to apply the map function to the elements we read.
 }
