@@ -69,6 +69,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Partition2Opt", "VSProjects
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ScanApps-Ex", "VSProjects\ScanApps-Ex\ScanApps-Ex.vcxproj", "{A0D55B6F-E65A-4245-971D-325B4B301BEB}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Partition2Opt-Ex", "VSProjects\Partition2Opt-Ex\Partition2Opt-Ex.vcxproj", "{1529A07A-FF10-48FC-BA3B-698FB9A1D400}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -277,6 +279,14 @@ Global
 		{A0D55B6F-E65A-4245-971D-325B4B301BEB}.Release|x64.Build.0 = Release|x64
 		{A0D55B6F-E65A-4245-971D-325B4B301BEB}.Release|x86.ActiveCfg = Release|Win32
 		{A0D55B6F-E65A-4245-971D-325B4B301BEB}.Release|x86.Build.0 = Release|Win32
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Debug|x64.ActiveCfg = Debug|x64
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Debug|x64.Build.0 = Debug|x64
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Debug|x86.ActiveCfg = Debug|Win32
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Debug|x86.Build.0 = Debug|Win32
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Release|x64.ActiveCfg = Release|x64
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Release|x64.Build.0 = Release|x64
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Release|x86.ActiveCfg = Release|Win32
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -306,6 +316,7 @@ Global
 		{29F5F7F8-5342-4DA5-B7B6-D18D1A182D2C} = {4A580F36-0B16-4194-847A-708CACE177D4}
 		{FC56F398-DF67-459E-95E7-348DF76F09D5} = {4A580F36-0B16-4194-847A-708CACE177D4}
 		{A0D55B6F-E65A-4245-971D-325B4B301BEB} = {226A4A5D-EFF3-4C03-94D8-A336910C576B}
+		{1529A07A-FF10-48FC-BA3B-698FB9A1D400} = {226A4A5D-EFF3-4C03-94D8-A336910C576B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {07C53C5A-2F20-4723-8761-E1F1E929F21C}
