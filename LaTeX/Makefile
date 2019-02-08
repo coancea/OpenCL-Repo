@@ -6,6 +6,8 @@ default:
 	pdflatex Day2.tex
 	pdflatex Day3.tex
 	pdflatex Day3.tex
+	pdflatex Day5.tex
+	pdflatex Day5.tex
 	rm -f *.aux *.log *.nav *.out *.snm *.toc *.vrb *~
 
 day1:
@@ -21,6 +23,11 @@ day2:
 day3:
 	pdflatex Day3.tex
 	pdflatex Day3.tex
+	rm -f *.aux *.log *.nav *.out *.snm *.toc *.vrb *~
+
+day5:
+	pdflatex Day5.tex
+	pdflatex Day5.tex
 	rm -f *.aux *.log *.nav *.out *.snm *.toc *.vrb *~
 
 clean:
