@@ -16,7 +16,7 @@ int4 mssp_mapf(int x) {
   v.s0 = x0;
   v.s1 = x0;
   v.s2 = x0;
-  v.s3 = 0;
+  v.s3 = x;
   return v;
 }
 
@@ -89,26 +89,54 @@ kernel void chunked_mssp_stage_two(int n, global int4 *input, global int4 *outpu
                                    local int4 *buf) {
   int gtid = get_global_id(0);
   int ltid = get_local_id(0);
+  int gid = get_group_id(0);
 
-  // Every thread fetches either an element of the input (if in
-  // bounds), or zero (if out of bounds).
-  buf[ltid] = gtid < n ? input[gtid] : 0;
+  int group_size = get_local_size(0);
+  int num_threads = get_global_size(0);
 
-  barrier(CLK_LOCAL_MEM_FENCE);
+  // How many chunks should each thread process?
+  int elems_per_thread = div_rounding_up(n, num_threads);
 
-  // Then we perform a tree reduction within the workgroup.
-  for (int skip = 1;
-       skip < get_local_size(0);
-       skip *= 2) {
-    int offset = skip;
-    if ((ltid & (2 * skip - 1)) == 0) {
-      buf[ltid] = mssp_redf(buf[ltid], buf[ltid+offset]);
+  int4 carry_in = mssp_mapf(0);
+  for (int i = 0; i < elems_per_thread; i++) {
+    int j = elems_per_thread * gid * group_size + i * group_size + ltid;
+
+    int4 x;
+    if (j < n) {
+      x = input[j];
+    } else {
+      x = mssp_mapf(0);
     }
 
+    // First thread in group also handles carry-in.
+    if (ltid == 0) {
+      x = mssp_redf(carry_in, x);
+    }
+
+    buf[ltid] = x;
+
     barrier(CLK_LOCAL_MEM_FENCE);
+
+    // Then we perform a tree reduction within the workgroup.
+    for (int skip = 1;
+         skip < get_local_size(0);
+         skip *= 2) {
+      int offset = skip;
+      if ((ltid & (2 * skip - 1)) == 0) {
+        buf[ltid] = mssp_redf(buf[ltid], buf[ltid+offset]);
+      }
+
+      barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (ltid == 0) {
+      carry_in = buf[0];
+    }
   }
 
+  // The first thread writes its result, which is equivalent to the
+  // result of the entire workgroup.
   if (ltid == 0) {
-    output[0] = buf[0];
+    output[gid] = carry_in;
   }
 }

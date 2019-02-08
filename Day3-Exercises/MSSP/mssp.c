@@ -39,7 +39,7 @@ cl_int4 mssp_mapf(int x) {
   v.s[0] = x0;
   v.s[1] = x0;
   v.s[2] = x0;
-  v.s[3] = 0;
+  v.s[3] = x;
   return v;
 }
 

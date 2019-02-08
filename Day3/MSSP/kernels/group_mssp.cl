@@ -12,7 +12,7 @@ int4 mssp_mapf(int x) {
   v.s0 = x0;
   v.s1 = x0;
   v.s2 = x0;
-  v.s3 = 0;
+  v.s3 = x;
   return v;
 }
 
