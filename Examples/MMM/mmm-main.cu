@@ -12,10 +12,10 @@
 #define TILE     16
 
 #define Ty  16
-#define Tx  16
-#define Ry  5
-#define Rx  5
-#define Tk  16
+#define Tx  32
+#define Ry  4
+#define Rx  4
+#define Tk  32
 
 #define GPU_RUNS 100
 
@@ -161,17 +161,24 @@ int main() {
       dim3 block(TILE, TILE, 1);
       dim3 grid (dimx, dimy, 1);
 
+      { //dry run
+        matMultTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
+        //matMultCacheKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
+        cudaThreadSynchronize();
+      }
+
       unsigned long int elapsed;
       struct timeval t_start, t_end, t_diff;
       gettimeofday(&t_start, NULL); 
       
-      matMultTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
-      //matMultCacheKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
+      for(int i=0; i<GPU_RUNS; i++) {
+          matMultTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
+      }
       cudaThreadSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);
-      elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec); 
+      elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec) / GPU_RUNS; 
 
       // copy result from device to host
       cudaMemcpy(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost);
