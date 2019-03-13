@@ -110,6 +110,11 @@ __global__ void matMultRegTiledKer(ElTp* A, ElTp* B, ElTp* C, int heightA, int w
   }
 }
 
+/************************************************/
+/*** Block+Register Tile with different tiles ***/
+/*** the parallel dimensions and the seq one  ***/
+/************************************************/
+
 template <class ElTp, int Ty, int Ry, int Tx, int Rx, int Tk>
 __global__ void mmmTnRn(ElTp* A, ElTp* B, ElTp* C, int heightA, int widthB, int widthA) {
   __shared__ ElTp Aloc[Ty*Ry][Tk];
@@ -191,4 +196,104 @@ __global__ void mmmTnRn(ElTp* A, ElTp* B, ElTp* C, int heightA, int widthB, int 
   }
 }
 
+/************************************************/
+/*** All Dims Parallelized, including Redomap ***/
+/************************************************/
+
+template <class ElTp, int Ty, int Ry, int Tx, int Rx, int Tk, int Rk>
+__global__ void mmmTnRnPar( ElTp* A, ElTp* B, ElTp* C, 
+                            int heightA, int widthB, int widthA ) {
+  __shared__ ElTp Aloc[Ty*Ry][Tk];
+  __shared__ ElTp Bloc[Tk][Tx*Rx]; 
+  ElTp css[Ry][Rx];
+  ElTp as[Ry];
+  ElTp bs[Rx];
+
+  unsigned int iii = blockIdx.y * Ty * Ry;
+  unsigned int jjj = blockIdx.x * Tx * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++)
+    #pragma unroll
+    for(int j=0; j<Rx; j++)
+      css[i][j] = 0.0;
+
+  unsigned int kkk = blockIdx.z * Tk * Rk;
+  for(int kk = kkk; kk < min(widthA, kkk+Tk*Rk); kk += Tk) {
+
+      // copy the slice of A: Ashreg = A[iii : iii + Ty*Ry , kk : kk+Tk]
+      //   such that the accesses to A and Aloc are both coalesced!
+      for(int i = threadIdx.y; i < Ty*Ry; i+=Ty) {
+          for(int k = threadIdx.x; k < Tk; k+=Tx) {
+              ElTp v = 0.0;
+              if ( (iii+i < heightA) && (kk+k < widthA) )
+                  v = A[(iii+i)*widthA + (kk+k)];
+              Aloc[i][k] = v;
+          }
+      }
+
+      // copy the slice of B: Bshreg = B[kk : kk+Tk , jjj : jjj + Tx*Rx]
+      //   such that the accesses to B and Bloc are both coalesced!
+      for(int k = threadIdx.y; k < Tk; k+=Ty) {
+          for(int j = threadIdx.x; j < Tx*Rx; j+=Tx) {
+              ElTp v = 0.0;
+              if ( (jjj+j < widthB) && (kk+k < widthA) )
+                  v = B[(kk+k)*widthB + (jjj + j)];
+              Bloc[k][j] = v;
+          }
+      }
+      __syncthreads();
+
+      for(int k = 0; k < Tk; k++) {
+          // copy from local to register memory for A
+          #pragma unroll
+          for(int i = 0; i < Ry; i++) {
+              as[i] = Aloc[threadIdx.y*Ry+i][k];
+          }
+          // copy from local to register memory for B
+          #pragma unroll
+          for(int j = 0; j < Rx; j++) {
+              bs[j] = Bloc[k][threadIdx.x*Rx+j];
+          }
+
+          #pragma unroll
+          for(int i=0; i<Ry; i++) {
+            #pragma unroll
+            for(int j=0; j<Rx; j++) {
+                // unfortunately we need a safety condition here
+                // or do we? because if i or j is out of range then
+                // cs[i][j] is invalid anyways -- so everything looks safe!
+                css[i][j] += as[i] * bs[j];
+            }
+          }
+      }
+      __syncthreads();
+  }
+
+  unsigned int indz = blockIdx.z * heightA * widthB;
+  unsigned int indy = iii + threadIdx.y * Ry;
+  unsigned int indx = jjj + threadIdx.x * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++) {
+    #pragma unroll
+    for(int j=0; j<Rx; j++) {
+      if( (indy+i < heightA) && (indx+j < widthB) )
+        C[indz + (indy+i)*widthB + (indx+j)] = css[i][j];
+    }
+  }
+}
+
+
+template <class ElTp>
+__global__ void seqRedInner(ElTp* Cext, ElTp* C, int lenC, int dimZ) {
+    unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(gid < lenC) {
+        ElTp acc = 0.0;
+        for(int i=0, ind = gid; i<dimZ; i++, ind+=lenC) {
+            acc += Cext[ind];
+        }
+        C[gid] = acc;
+    }
+}
 #endif
