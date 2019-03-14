@@ -59,8 +59,8 @@ __global__ void tensorProdNaiveKer(ElTp* A, ElTp* B, ElTp* C, const int len) {
 
 template <class ElTp, int T> 
 __global__ void tensorProdTiledKerNorm(ElTp* A, ElTp* B, ElTp* C, const int len) {
-    __shared__ ElTp Aloc[T][T][T][T+1];
-    __shared__ ElTp Bloc[T][T][T][T+1];
+    __shared__ ElTp Aloc[T][T][T][2*T+1];
+    __shared__ ElTp Bloc[T][T][T][2*T+1];
     int i, ii, j, jj, aa, k, kk, c, cc, bb;
     int tmp;
 
@@ -99,26 +99,34 @@ __global__ void tensorProdTiledKerNorm(ElTp* A, ElTp* B, ElTp* C, const int len)
         }
     }
 
-    for(int dd=0; dd<len; dd+=T) {
+    for(int dd=0; dd<len; dd+=2*T) {
         { // copy slice of A from global to local memory (coalesced on d)
-            ElTp elm = 0.0;
-            bool safeA = (aa+c < len) || (ii+i < len) || (jj+j < len) || (dd+k < len);
-            if( safeA ) {
-                elm = A4(A,len,aa+c,ii+i,jj+j,dd+k); // need of LMAD copy
+            #pragma unroll
+            for(int q=0; q<2; q++) {
+                ElTp elm = 0.0;
+                bool safeA = (aa+c < len) || (ii+i < len) || (jj+j/2+q*(T/2) < len) || (dd+(j%2)*T+k < len);
+                if( safeA ) {
+                    //elm = A4(A, len, aa+c, ii+i, jj + j, dd + k); // need of LMAD copy
+                    elm = A4(A,len,aa+c,ii+i,jj + j/2 + q*(T/2), dd + (j%2)*T + k); 
+                }
+                Aloc[c][i][j/2 + q*(T/2)][(j%2)*T + k] = elm;
             }
-            Aloc[c][i][j][k] = elm;
         }
         { // copy slice of B from global to local memory (coalesced on d)
-            ElTp elm = 0.0;
-            bool safeB = (bb+c < len) || (cc+i < len) || (kk+j < len) || (dd+k < len);
-            if( safeB ) {
-                elm = A4(B,len,bb+c,cc+i,kk+j,dd+k); // need of LMAD copy
+            #pragma unroll
+            for(int q=0; q<2; q++) {
+                ElTp elm = 0.0;
+                bool safeB = (bb+c < len) || (cc+i < len) || (kk + j/2 + q*(T/2) < len) || (dd + (j%2)*T + k < len);
+                if( safeB ) {
+                    //elm = A4(B, len, bb+c, cc+i, kk+j, dd+k); // need of LMAD copy
+                    elm = A4(B,len,bb+c, cc+i, kk + j/2 + q*(T/2), dd + (j%2)*T + k);
+                }
+                Bloc[c][i][j/2 + q*(T/2)][(j%2)*T + k] = elm;
             }
-            Bloc[c][i][j][k] = elm;
         }
         __syncthreads();
 
-        for(int d=0; d<T; d++) {
+        for(int d=0; d<2*T; d++) {
             // copy slice of A from local to register memory
             #pragma unroll
             for(int a=0; a<T; a++) {
