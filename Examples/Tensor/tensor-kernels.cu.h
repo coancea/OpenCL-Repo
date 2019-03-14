@@ -59,8 +59,8 @@ __global__ void tensorProdNaiveKer(ElTp* A, ElTp* B, ElTp* C, const int len) {
 
 template <class ElTp, int T> 
 __global__ void tensorProdTiledKerNorm(ElTp* A, ElTp* B, ElTp* C, const int len) {
-    __shared__ ElTp Aloc[T][T][T][2*T+1];
-    __shared__ ElTp Bloc[T][T][T][2*T+1];
+    __shared__ ElTp Aloc[T][T][T][2*T];
+    __shared__ ElTp Bloc[T][T][T][2*T];
     int i, ii, j, jj, aa, k, kk, c, cc, bb;
     int tmp;
 

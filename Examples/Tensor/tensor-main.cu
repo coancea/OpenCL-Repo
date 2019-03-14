@@ -6,9 +6,9 @@
 
 #include "tensor-kernels.cu.h"
 
-#define GPU_RUNS    100
+#define GPU_RUNS    25
 
-#define DIMSIZE 16
+#define DIMSIZE 24
 #define WORK    (2.0*DIMSIZE*DIMSIZE*DIMSIZE*DIMSIZE*DIMSIZE*DIMSIZE*DIMSIZE)
 #define TILE    4
 
