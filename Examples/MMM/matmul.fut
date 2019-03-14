@@ -1,4 +1,6 @@
 -- ==
+-- compiled input @ matmul-data/m1024x1024x1024
+
 -- compiled input @ matmul-data/m10x500x64
 
 -- notune compiled input @ matmul-data/2pow25_work_2pow0_outer

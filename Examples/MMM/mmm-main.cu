@@ -6,19 +6,53 @@
 
 #include "mmm-kernels.cu.h"
 
-#define WIDTH_A  1024//1024 //1024//2048
-#define HEIGHT_A 1024//2048//2048//2048
-#define WIDTH_B  4096//2048
-#define TILE     16
+#define GPU_RUNS    100
+#define SMALL       1
+#define LONGINNER   1
 
-#define Ty  16
-#define Tx  32
-#define Ry  4
-#define Rx  4
-#define Tk  32
-#define Rk  32
+#if SMALL
 
-#define GPU_RUNS 100
+    #define WIDTH_A  64
+    #define HEIGHT_A 10
+    #define WIDTH_B  500
+    #define TILE     16
+
+    #define Ty  10
+    #define Tx  16
+    #define Ry  1
+    #define Rx  1
+    #define Tk  16
+    #define Rk  1
+
+#elif LONGINNER
+
+    #define WIDTH_A  (1024*1024)//1024 //1024//2048
+    #define HEIGHT_A 64//2048//2048//2048
+    #define WIDTH_B  64//2048
+    #define TILE     16
+
+    #define Ty  16
+    #define Tx  16
+    #define Ry  4
+    #define Rx  4
+    #define Tk  32
+    #define Rk  1024
+
+#else
+
+    #define WIDTH_A  1024//1024 //1024//2048
+    #define HEIGHT_A 1024//2048//2048//2048
+    #define WIDTH_B  1024//4096//2048
+    #define TILE     16//16
+
+    #define Ty  16
+    #define Tx  32
+    #define Ry  4
+    #define Rx  4
+    #define Tk  32
+    #define Rk  32
+
+#endif 
 
 /////////////////////////////////////////////////////////
 // Helpers
@@ -204,11 +238,13 @@ int main() {
       dim3 block(TILE, TILE, 1);
       dim3 grid (dimx, dimy, 1);
 
+      //printf("\nDimy: %d, dimx: %d, tile: %d\n", dimy, dimx, TILE);
+
       { // one dry run
         matMultRegTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
         cudaThreadSynchronize();
       }
-
+      cudaMemset(d_C, 0, mem_size_C);
       unsigned long int elapsed;
       struct timeval t_start, t_end, t_diff;
       gettimeofday(&t_start, NULL); 
@@ -294,6 +330,7 @@ int main() {
     
       const unsigned int blockred = 256; 
       const unsigned int dimred = (HEIGHT_A*WIDTH_B + blockred - 1) / blockred;
+      cudaMemset(d_C, 0, mem_size_C);
 
       { // one dry run
         mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
