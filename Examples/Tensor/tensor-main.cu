@@ -129,6 +129,8 @@ int main() {
       tensorProdNaiveKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, DIMSIZE);
       cudaThreadSynchronize();
 
+      cudaMemset(d_C, 0, mem_size_C);
+
       double elapsed;
       struct timeval t_start, t_end, t_diff;
       gettimeofday(&t_start, NULL); 
@@ -163,6 +165,8 @@ int main() {
 
       tensorProdTiledKerNorm<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, DIMSIZE);
       cudaThreadSynchronize();
+
+      cudaMemset(d_C, 0, mem_size_C);
 
       double elapsed;
       struct timeval t_start, t_end, t_diff;
