@@ -117,6 +117,10 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  float* data_vals_in
     }
     cudaThreadSynchronize();
 
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec) / ((double)GPU_RUNS);
+
     cudaFree(tmp_sort_mem);
     cudaFree(tmp_red_mem);
     cudaFree(data_keys_out);
@@ -124,9 +128,6 @@ double sortRedByKeyCUB( uint32_t* data_keys_in,  float* data_vals_in
     cudaFree(unique_keys); 
     cudaFree(num_segments);
 
-    gettimeofday(&t_end, NULL);
-    timeval_subtract(&t_diff, &t_end, &t_start);
-    elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec) / ((double)GPU_RUNS);
     return elapsed;
 }
 
