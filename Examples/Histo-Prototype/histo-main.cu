@@ -6,7 +6,7 @@
 #include <time.h> 
 
 #define BLOCK       1024
-#define GPU_RUNS    300
+#define GPU_RUNS    100
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -27,10 +27,6 @@ unsigned int BLOCK_SZ;
 #include "histo-wrap.cu.h"
 
 
-/////////////////////////////////////////////////////////
-// Program main
-/////////////////////////////////////////////////////////
-
 int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const int m = ((Q*4 / el_size) * BLOCK) / H;
@@ -39,6 +35,54 @@ int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
     return m;
 }
 
+
+void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
+    const int num_histos = 5;
+    const int num_m_degs = 5;
+    const int histo_sizes[num_histos] = { 31, 63, 127, 255, 511 }; //{ 64, 128, 256, 512 };
+    //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
+
+    unsigned long runtimes[3][num_histos][num_m_degs];
+
+    for(int i=0; i<num_histos; i++) {
+        const int H = histo_sizes[i];
+        const int m_opt = optimSubHistoDeg(ADD, 12, H);
+
+        const int min_HB = min(H,BLOCK);
+        const int subhisto_degs[5] = { m_opt, (8*BLOCK) / min_HB, (4*BLOCK) / min_HB, (1*BLOCK) / min_HB, 1};
+
+        goldSeqHisto(INP_LEN, H, h_input, h_histo);
+
+        for(int j=0; j<num_m_degs; j++) {
+            const int histos_per_block = subhisto_degs[j];
+            runtimes[0][i][j] = locMemHwdAddCoop(ADD, INP_LEN, H, histos_per_block, d_input, h_histo);
+            runtimes[1][i][j] = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+            runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, max(histos_per_block/2,1), d_input, h_histo);
+        }
+    }
+        
+    for(int k=0; k<3; k++) {
+        if     (k==0) printf("LOC_ADD\t");
+        else if(k==1) printf("LOC_CAS\t");
+        else if(k==2) printf("LOC_XCG\t");
+
+        for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
+        printf("\n");
+        for(int j=0; j<num_m_degs; j++) {
+            printf("SH_DEG_%d\t", j);
+            for(int i = 0; i<num_histos; i++) {
+                printf("%lu\t", runtimes[k][i][j]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+
+/////////////////////////////////////////////////////////
+// Program main
+/////////////////////////////////////////////////////////
 int main() {
     // set seed for rand()
     srand(2006);
@@ -71,15 +115,10 @@ int main() {
     randomInit(h_input, INP_LEN);
     zeroOut(h_histo, Hmax);
     
-    // 3. allocate device memory
+    // 3. allocate device memory for input and copy from host
     int* d_input;
-    int* d_histo;
     cudaMalloc((void**) &d_input, mem_size_input);
-    cudaMalloc((void**) &d_histo, mem_size_histo);
- 
-    // 4. copy host memory to device
     cudaMemcpy(d_input, h_input, mem_size_input, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_histo, h_histo, mem_size_histo, cudaMemcpyHostToDevice);
  
 #if 0
     { // 5. compute a bunch of histograms
@@ -102,54 +141,13 @@ int main() {
     }
 #endif
 
-    { // 5. Dataset: Local Memory:
-        const int num_histos = 5;
-        const int num_m_degs = 5;
-        const int histo_sizes[num_histos] = { 32, 64, 128, 256, 512 }; //{ 64, 128, 256, 512 };
-        //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
-
-        unsigned long runtimes[3][num_histos][num_m_degs];
-
-        for(int i=0; i<num_histos; i++) {
-            const int H = histo_sizes[i];
-            const int m_opt = optimSubHistoDeg(ADD, 12, H);
-
-            const int min_HB = min(H,BLOCK);
-            const int subhisto_degs[5] = { m_opt, (8*BLOCK) / min_HB, (4*BLOCK) / min_HB, (1*BLOCK) / min_HB, 1};
-
-            goldSeqHisto(INP_LEN, H, h_input, h_histo);
-
-            for(int j=0; j<num_m_degs; j++) {
-                const int histos_per_block = subhisto_degs[j];
-                runtimes[0][i][j] = locMemHwdAddCoop(ADD, INP_LEN, H, histos_per_block, d_input, h_histo);
-                runtimes[1][i][j] = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
-                runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, max(histos_per_block/2,1), d_input, h_histo);
-            }
-        }
-        
-        for(int k=0; k<3; k++) {
-            if     (k==0) printf("LOC_ADD\t");
-            else if(k==1) printf("LOC_CAS\t");
-            else if(k==2) printf("LOC_XCG\t");
-
-            for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
-            printf("\n");
-            for(int j=0; j<num_m_degs; j++) {
-                printf("SH_DEG_%d\t", j);
-                for(int i = 0; i<num_histos; i++) {
-                    printf("%lu\t", runtimes[k][i][j]);
-                }
-                printf("\n");
-            }
-            printf("\n");
-        }
-    }
-
+#if 1
+    runLocalMemDataset(h_input, h_histo, d_input);
+#endif
 
     // 7. clean up memory
     free(h_input);
     free(h_histo);
     cudaFree(d_input);
-    cudaFree(d_histo);
 }
 
