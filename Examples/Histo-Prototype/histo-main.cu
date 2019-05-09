@@ -12,9 +12,19 @@
 #define INP_LEN     50000000
 #define Hmax        100000
 
-#define RACE_FACT   8
-
+#ifndef DEBUG_INFO
 #define DEBUG_INFO  0
+#endif
+
+#ifndef RACE_FACT
+#define RACE_FACT   8
+#endif
+
+#ifndef LOCMEMW_PERTHD
+#define LOCMEMW_PERTHD 12
+#endif
+
+
 
 cudaDeviceProp prop;
 unsigned int HWD;
@@ -30,8 +40,8 @@ unsigned int BLOCK_SZ;
 int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
     const int el_size = (prim_kind == XCHG)? 2*sizeof(int) : sizeof(int);
     const int m = ((Q*4 / el_size) * BLOCK) / H;
-    const int coop = (BLOCK + m - 1) / m;
-    printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
+    //const int coop = (BLOCK + m - 1) / m;
+    //printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
     return m;
 }
 
@@ -46,10 +56,11 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
 
     for(int i=0; i<num_histos; i++) {
         const int H = histo_sizes[i];
-        const int m_opt = optimSubHistoDeg(ADD, 12, H);
+        const int m_opt = optimSubHistoDeg(ADD, LOCMEMW_PERTHD, H);
 
         const int min_HB = min(H,BLOCK);
-        const int subhisto_degs[5] = { m_opt, (8*BLOCK) / min_HB, (4*BLOCK) / min_HB, (1*BLOCK) / min_HB, 1};
+        const int subhisto_degs[5] = { 1, BLOCK/min_HB, 3*BLOCK/min_HB, 6*BLOCK/min_HB, m_opt }; 
+        //{ m_opt, (8*BLOCK) / min_HB, (4*BLOCK) / min_HB, (1*BLOCK) / min_HB, 1};
 
         goldSeqHisto(INP_LEN, H, h_input, h_histo);
 

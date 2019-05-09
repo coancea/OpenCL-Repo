@@ -76,7 +76,7 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     cudaMalloc((void**) &d_histos, mem_size_histos);
     cudaMalloc((void**) &d_histo,  H * sizeof(int));
 
-    printf("multi-histogram degree: %d, H:%d\n", histos_per_block, H);
+    //printf("multi-histogram degree: %d, H:%d\n", histos_per_block, H);
 
     { // dry run
       if(select == ADD) {
