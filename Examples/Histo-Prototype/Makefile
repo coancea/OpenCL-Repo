@@ -12,11 +12,15 @@ race-1: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
 	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=1 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
 
-race-8: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
-	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=8 -o $(PROGRAM) histo-main.cu
+race-10: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
+	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=10 -o $(PROGRAM) histo-main.cu
+	./$(PROGRAM)
+
+race-30: histo-main.cu histo-wrap.cu.h histo-kernels.cu.h
+	$(COMPILER) $(OPT_FLAGS) -D RACE_FACT=30 -o $(PROGRAM) histo-main.cu
 	./$(PROGRAM)
 
 .PHONY: clean
 
 clean:
-	rm -f $(PROGRAMS) *.o
+	rm -f $(PROGRAM) *.o

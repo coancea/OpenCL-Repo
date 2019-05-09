@@ -6,18 +6,18 @@
 #include <time.h> 
 
 #define BLOCK       1024
-#define GPU_RUNS    100
+#define GPU_RUNS    300
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
 #define Hmax        100000
-
+ 
 #ifndef DEBUG_INFO
 #define DEBUG_INFO  0
 #endif
 
 #ifndef RACE_FACT
-#define RACE_FACT   8
+#define RACE_FACT   10
 #endif
 
 #ifndef LOCMEMW_PERTHD
@@ -149,6 +149,24 @@ int main() {
         //coop = optimalCoop(XCHG, 12, H);
         unsigned long tm_xch = locMemHwdAddCoop(XCHG, INP_LEN, H, histos_per_block/2, d_input, h_histo);
         printf("Histogram Local-Mem XCG with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_xch);
+    }
+#endif
+
+#if 0
+    { // 5. compute a bunch of histograms
+        const int H = 31;
+        
+        unsigned long tm_seq = goldSeqHisto(INP_LEN, H, h_input, h_histo);
+        printf("Histogram Sequential        took: %lu microsecs\n", tm_seq);
+
+        int histos_per_block = 6*BLOCK/min(H, BLOCK);
+
+        unsigned long tm_cas1 = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        printf("Histogram Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_cas1);
+
+        histos_per_block = optimSubHistoDeg(CAS, LOCMEMW_PERTHD, H); 
+        unsigned long tm_cas2 = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        printf("Histogram Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_cas2);
     }
 #endif
 
