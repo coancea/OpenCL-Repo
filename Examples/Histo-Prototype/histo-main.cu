@@ -92,23 +92,9 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
             runtimes[2][i][j] = locMemHwdAddCoop(XCHG, INP_LEN, H, max(histos_per_block/2,1), d_input, h_histo);
         }
     }
-        
-    for(int k=0; k<3; k++) {
-        if     (k==0) printf("LOC_ADD\t");
-        else if(k==1) printf("LOC_CAS\t");
-        else if(k==2) printf("LOC_XCG\t");
 
-        for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
-        printf("\n");
-        for(int j=0; j<num_m_degs; j++) {
-            printf("SH_DEG_%d\t", j);
-            for(int i = 0; i<num_histos; i++) {
-                printf("%lu\t", runtimes[k][i][j]);
-            }
-            printf("\n");
-        }
-        printf("\n");
-    }
+    //printTextTab(runtimes, histo_sizes, RACE_FACT);
+    printLaTex  (runtimes, histo_sizes, RACE_FACT);
 }
 
 

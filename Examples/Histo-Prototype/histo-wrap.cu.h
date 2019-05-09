@@ -142,4 +142,73 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
     return (elapsed/num_gpu_runs);
 }
 
+/*********************************************/
+/*** Various Helpers, for example printing ***/
+/*********************************************/
+
+void printTextTab(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
+    const int num_histos = 5;
+    const int num_m_degs = 5;
+    for(int k=0; k<3; k++) {
+        if     (k==0) printf("ADD, R=%d\t", R);
+        else if(k==1) printf("CAS, R=%d\t", R);
+        else if(k==2) printf("XCG, R=%d\t", R);
+
+        for(int i = 0; i<num_histos; i++) { printf("H=%d\t", histo_sizes[i]); }
+        printf("\n");
+        for(int j=0; j<num_m_degs; j++) {
+            if      (j==0) printf("C = B\t");
+            else if (j==1) printf("C = H / 1\t");
+            else if (j==2) printf("C = H / 3\t");
+            else if (j==3) printf("C = H / 6\t");
+            else if (j==4) printf("C = H /12\t");
+
+            for(int i = 0; i<num_histos; i++) {
+                printf("%lu\t", runtimes[k][i][j]);
+            }
+            printf("\n");
+        }
+        printf("\n");
+    }
+}
+
+/**
+  \begin{tabular}{|l|l|l|l|l|l|}\hline
+        CAS, RF=30 &     H=25   & H=57   & H=121 &  H=249 &  H=505\\\hline
+        C = B      &     815354 & 822372 & 72282 &  24621 &  9333\\
+        C = H / 1  &     1175   & 4448   & 2986  &  3243  &  3559\\
+        C = H / 3  &     508    & 954    & 928   &  1071  &  1149\\
+        C = H / 6  &     474    & 522    & 628   &  692   &  711\\
+        C = H / 12 &     464    & 472    & 524   &  553   &  572\\\hline
+  \end{tabular}
+ */
+void printLaTex(const unsigned long runtimes[3][5][5], const int histo_sizes[5], const int R) {
+    const int num_histos = 5;
+    const int num_m_degs = 5;
+    for(int k=0; k<3; k++) {
+        printf("\\begin{tabular}{|l|l|l|l|l|l|}\\hline\n");
+        if     (k==0) printf("ADD, R=%d", R);
+        else if(k==1) printf("CAS, R=%d", R);
+        else if(k==2) printf("XCG, R=%d", R);
+
+        for(int i = 0; i<num_histos; i++) { printf("\t& H=%d", histo_sizes[i]); }
+        printf("\\\\\\hline\n");
+        for(int j=0; j<num_m_degs; j++) {
+            if      (j==0) printf("C = B");
+            else if (j==1) printf("C = H / 1");
+            else if (j==2) printf("C = H / 3");
+            else if (j==3) printf("C = H / 6");
+            else if (j==4) printf("C = H /12");
+            
+            for(int i = 0; i<num_histos; i++) {
+                printf("\t& %lu", runtimes[k][i][j]);
+            }
+            printf("\\\\");
+            if(j == (num_m_degs-1)) printf("\\hline");
+            printf("\n");
+        }
+        printf("\\end{tabular}\n");
+    }
+}
+
 #endif // HISTO_WRAPPER
