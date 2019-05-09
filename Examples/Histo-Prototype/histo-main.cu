@@ -6,7 +6,7 @@
 #include <time.h> 
 
 #define BLOCK       1024
-#define GPU_RUNS    300
+#define GPU_RUNS    200
 #define CPU_RUNS    1
 
 #define INP_LEN     50000000
@@ -17,7 +17,7 @@
 #endif
 
 #ifndef RACE_FACT
-#define RACE_FACT   10
+#define RACE_FACT   8
 #endif
 
 #ifndef LOCMEMW_PERTHD
@@ -46,10 +46,31 @@ int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
 }
 
 
+void testLocMemAlignmentProblem(const int H, int* h_input, int* h_histo, int* d_input) {
+        
+        unsigned long tm_seq = goldSeqHisto(INP_LEN, H, h_input, h_histo);
+        printf("Histogram Sequential        took: %lu microsecs\n", tm_seq);
+
+        int histos_per_block = 3*BLOCK/min(H, BLOCK);
+
+        unsigned long tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
+
+        histos_per_block = 6*BLOCK/min(H, BLOCK);
+        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
+
+        histos_per_block = optimSubHistoDeg(CAS, LOCMEMW_PERTHD, H); 
+        tm_cas = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
+        printf("Histogram H=%d Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", H, histos_per_block, tm_cas);
+}
+
+
+
 void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
     const int num_histos = 5;
     const int num_m_degs = 5;
-    const int histo_sizes[num_histos] = { 31, 63, 127, 255, 511 }; //{ 64, 128, 256, 512 };
+    const int histo_sizes[num_histos] = { 25, 57, 121, 249, 505 }; //{ 64, 128, 256, 512 };
     //const AtomicPrim atomic_kinds[3] = {ADD, CAS, XCHG};
 
     unsigned long runtimes[3][num_histos][num_m_degs];
@@ -154,19 +175,8 @@ int main() {
 
 #if 0
     { // 5. compute a bunch of histograms
-        const int H = 31;
-        
-        unsigned long tm_seq = goldSeqHisto(INP_LEN, H, h_input, h_histo);
-        printf("Histogram Sequential        took: %lu microsecs\n", tm_seq);
-
-        int histos_per_block = 6*BLOCK/min(H, BLOCK);
-
-        unsigned long tm_cas1 = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
-        printf("Histogram Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_cas1);
-
-        histos_per_block = optimSubHistoDeg(CAS, LOCMEMW_PERTHD, H); 
-        unsigned long tm_cas2 = locMemHwdAddCoop(CAS, INP_LEN, H, histos_per_block, d_input, h_histo);
-        printf("Histogram Local-Mem CAS with subhisto-degree %d took: %lu microsecs\n", histos_per_block, tm_cas2);
+        for(int i=0; i<34; i++)
+            testLocMemAlignmentProblem(31+i, h_input, h_histo, d_input);
     }
 #endif
 

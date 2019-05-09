@@ -14,8 +14,9 @@ __device__ __host__ inline
 struct indval<T>
 f(T pixel, int his_sz)
 {
+  const int ratio = max(1, his_sz/RACE_FACT);
   struct indval<T> iv;
-  iv.index = ((int)pixel) % (his_sz / RACE_FACT);
+  iv.index = ((int)pixel) % ratio;
   iv.value = pixel;
   return iv;
 }
