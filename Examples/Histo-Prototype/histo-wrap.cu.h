@@ -134,7 +134,9 @@ locMemHwdAddCoop(AtomicPrim select, const int N, const int H, const int histos_p
         cudaFree(d_histo);
 
         if(!is_valid) {
-            printf("locMemHwdAddCoop: Validation FAILS! Exiting!\n\n");
+            int coop = (BLOCK + histos_per_block - 1) / histos_per_block;
+            printf( "locMemHwdAddCoop: Validation FAILS! M:%d, coop:%d, H:%d, ADD:%d, Exiting!\n\n"
+                  , histos_per_block, coop, H, (int)(select==ADD) );
             exit(1);
         }
     }

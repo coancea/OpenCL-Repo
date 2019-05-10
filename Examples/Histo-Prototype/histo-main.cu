@@ -42,7 +42,7 @@ int optimSubHistoDeg(const AtomicPrim prim_kind, const int Q, const int H) {
     const int m = ((Q*4 / el_size) * BLOCK) / H;
     //const int coop = (BLOCK + m - 1) / m;
     //printf("COOP LEVEL: %d, subhistogram degree: %d\n", coop, m);
-    return m;
+    return min(m, BLOCK);
 }
 
 
@@ -93,8 +93,8 @@ void runLocalMemDataset(int* h_input, int* h_histo, int* d_input) {
         }
     }
 
-    //printTextTab(runtimes, histo_sizes, RACE_FACT);
-    printLaTex  (runtimes, histo_sizes, RACE_FACT);
+    printTextTab(runtimes, histo_sizes, RACE_FACT);
+    //printLaTex  (runtimes, histo_sizes, RACE_FACT);
 }
 
 

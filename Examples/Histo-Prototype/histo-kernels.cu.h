@@ -98,9 +98,14 @@ locMemHwdAddCoopKernel( const int N, const int H,
     const unsigned int tid = threadIdx.x;
     const unsigned int gid = blockIdx.x * blockDim.x + tid;
     int his_block_sz = hists_per_block * H;
-
-    int lhid = (tid % hists_per_block) * H;
     int ghid = blockIdx.x * hists_per_block * H;
+
+#ifdef SLOW_MODE
+    int coop = (blockDim.x + hists_per_block - 1) / hists_per_block;
+    int lhid = (tid / coop) * H;
+#else
+    int lhid = (tid % hists_per_block) * H;
+#endif
     
     { // initialize local histograms (and locks if in case XCHG)
         unsigned int tot_len = his_block_sz;
@@ -113,7 +118,8 @@ locMemHwdAddCoopKernel( const int N, const int H,
     }
 
     // compute local histograms
-    if(gid < num_threads) {
+    //if(gid < num_threads) 
+    {
         for(int i=gid; i<N; i+=num_threads) {
             struct indval<int> iv = f<int>(d_input[i], H);
 
