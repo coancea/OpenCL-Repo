@@ -30,6 +30,8 @@ OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
 
+void cleanUpBuffer(size_t buf_len, cl_mem buf);
+
 void initOclControl() {
     char    compile_opts[128]; 
     sprintf(compile_opts, "-D TILE=%d -D RT=%d -D real=%s", TILE, RT, REAL_STR);
@@ -128,6 +130,28 @@ void freeOclBuffKers() {
     clReleaseMemObject(buffs.dA);
     clReleaseMemObject(buffs.dB);
     clReleaseMemObject(buffs.dC);
+}
+
+void cleanUpBuffer(size_t buf_len, cl_mem buf) {
+    real pattern = 0.0;
+    cl_int error = 
+        clEnqueueFillBuffer( ctrl.queue, buf, (void*)&pattern, sizeof(pattern),
+                             0, buf_len*sizeof(pattern), 0, NULL, NULL );
+    clFinish(ctrl.queue);
+    OPENCL_SUCCEED(error);
+#if 0
+    {
+        real cpu_vct[100];
+        gpuToCpuTransfer(100, cpu_vct);    
+
+        for(int i=0; i<100; i++) {
+            if(cpu_vct[i] != 0) {
+                printf("cleanUpBuffer: elem %d is %f instead of 0!\n", i, cpu_vct[i]);
+                exit(1);
+            }
+        }
+    }
+#endif
 }
 
 #endif // MMM_HELPER

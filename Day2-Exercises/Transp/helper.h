@@ -49,6 +49,7 @@ OclBuffers buffs;
 
 size_t mkGlobalDim(const uint32_t pardim, const uint32_t T);
 real arithmFun(real accum, real a);
+void cleanUpBuffer(size_t buf_len, cl_mem buf);
 
 void initOclControl() {
     char    compile_opts[128];
@@ -195,6 +196,15 @@ void freeOclBuffKers() {
     clReleaseMemObject(buffs.dB);
     clReleaseMemObject(buffs.dAtr);
     clReleaseMemObject(buffs.dBtr);
+}
+
+void cleanUpBuffer(size_t buf_len, cl_mem buf) {
+    real pattern = 0.0;
+    cl_int error = 
+        clEnqueueFillBuffer( ctrl.queue, buf, (void*)&pattern, sizeof(pattern),
+                             0, buf_len*sizeof(pattern), 0, NULL, NULL );
+    clFinish(ctrl.queue);
+    OPENCL_SUCCEED(error);
 }
 
 inline

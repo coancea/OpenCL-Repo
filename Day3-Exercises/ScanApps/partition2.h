@@ -28,12 +28,15 @@ typedef struct PartitionBUFFS {
     cl_mem        out;  // [N]t 
 } PartitionBuffs;
 
+/**
+ * Exercise 3: 
+ */
 cl_int runPartition(PartitionBuffs arrs) {
     cl_int error = CL_SUCCESS;
     const size_t localWorkSize  = WORKGROUP_SIZE;
     const size_t globalWorkSize = ((arrs.N + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE) * WORKGROUP_SIZE; 
     
-    { // call the kernel that maps the predicate
+    { // call the kernel that maps the predicate and computes tfs and ffs
         error |= clSetKernelArg(kers.mapPredPart, 0, sizeof(uint32_t), (void *)&arrs.N);
         error |= clSetKernelArg(kers.mapPredPart, 1, sizeof(cl_mem), (void*)&arrs.inp);
         error |= clSetKernelArg(kers.mapPredPart, 2, sizeof(cl_mem), (void*)&arrs.tfs);
@@ -56,7 +59,8 @@ cl_int runPartition(PartitionBuffs arrs) {
         error |= runScan(scan_arrs);
     }
 
-    { // call the scatter kernel
+    { // call the scatter kernel: "isF" is actually "tmps" from slides
+      // isT and isF are the result of scan
         error |= clSetKernelArg(kers.scatterPart, 0, sizeof(uint32_t), (void *)&arrs.N);
         error |= clSetKernelArg(kers.scatterPart, 1, sizeof(cl_mem), (void*)&arrs.inp);
         error |= clSetKernelArg(kers.scatterPart, 2, sizeof(cl_mem), (void*)&arrs.isT);
@@ -106,6 +110,7 @@ void profilePartition(PartitionBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
+        cleanUpBuffer(arrs.N, arrs.out);
     }
 }
 

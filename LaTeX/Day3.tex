@@ -2,6 +2,7 @@
 
 \usepackage{paratype}
 \setbeamerfont{frametitle}{family=\bf}
+\usepackage{listings}
 
 % Beamer theme settings
 \usecolortheme{seagull}
@@ -113,8 +114,11 @@ Applies a function to every element of the input array producing an array of equ
 X = & \emph{map}(~f, ~ [& $a_1$, & $a_2$, & .., & $a_n$ & ])\\
     &      & $\downarrow$ & $\downarrow$ &  & $\downarrow$ & &\\
 X $\equiv$ &  [  & \emph{f($a_1$)}, & \emph{f($a_2$)}, & .., & \emph{f($a_n$)} & ] &
-\end{tabular}
-\bigskip\pause
+\end{tabular}\bigskip
+
+\begin{scriptsize}
+Similar: {\tt~~~~map2(f,[$a_1$,$\ldots$,$a_n$],[$b_1$,$\ldots$,$b_n$]) $\equiv$ [f($a_1$,$b_1$),$\ldots$,f($a_n$,$b_n$)]} 
+\end{scriptsize}\\\bigskip\pause
 
 \emp{Map Fusion:} \emph{{\tt~~~map(f, map(g, A))} $~\equiv~$ {\tt map(f o g, A)}} \bigskip
 
@@ -126,7 +130,7 @@ X = map(g, A) & $\equiv$ & [ & g($a_1$), &g($a_2$), &$\ldots$, &g($a_n$) &]\\
 \end{tabular}
 \bigskip
 
-Fusion is one of the most important optimizations, as it saves bandwidth!
+Fusion is a very important optimizations; saves bandwidth!
 
 \end{frame}
 
@@ -368,7 +372,7 @@ We need to compute extra information:\pause
 \includegraphics[height=22ex]{img/day3/mssp2}
 \medskip
 Lets compute the {\tt mis}, {\tt mcs}, {\tt mss}, and {\tt ts} for
-the result of the two concatenating segments.
+the result of the two concatenating segments. $\uparrow$ denotes {\tt max}.
 
 \bigskip
 {\tt mis = \pause mis1 $\uparrow$ (ts1 + mis2)}
@@ -445,7 +449,142 @@ fuse the {\tt map} with the {\tt reduce} operations.
 \begin{frame}[fragile,t]
   \frametitle{Exercise 1: OpenCL Implementation of MSSP}
 
-Troels should add description here of what does he want the students to do!
+  \begin{itemize}
+  \item For this exercise, you will implement MSSP as an OpenCL program.
+  \item As inspiration, we will first study four OpenCL
+    implementations of \textit{summing an integer array}.
+  \end{itemize}
+
+\huge
+  \[
+    \sum_{i < n} x[i]
+  \]
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Binary Tree Reduction}
+
+  \textbf{The idea:} each thread reads two neighbouring elements, adds
+  them together, and writes one element.  This halves the array in
+  size.  Continue until only a single element is left.
+
+\begin{center}
+  \includegraphics[height=20ex]{img/day3/ReduceEg.pdf}
+\end{center}
+
+\begin{itemize}
+\item Each level becomes a kernel invocation, with number of threads
+  equal to half the number of array elements.
+\item $O(n)$ work and $O(\log(n))$ span (optimal).
+\item \textbf{Why is this not efficient?}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Improving the Tree Reduction}
+
+  \textbf{The idea:} instead of shrinking the array by a factor of two
+  for each level, shrink it by the workgroup size.
+
+  \begin{itemize}
+  \item Same asymptotic performance.
+  \item Avoids kernels with very few threads.  E.g with workgroup size
+    $256$: $10000000 \rightarrow 39063 \rightarrow 153 \rightarrow 1$.
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Applying Brent's Lemma}
+
+  \textbf{The idea:} instead of letting the thread count depend on the
+  input size, always launch the same number of threads, and have each
+  thread perform an efficient sequential summation of a \textit{chunk}
+  of the input.
+
+  \begin{itemize}
+  \item GPUs have a maximum (hardware/problem-dependent) capacity for
+    exploiting parallelism.  Beyond that limit, parallelism is at best
+    worthless, and usually comes with overhead (e.g. excessive
+    synchronisation).
+  \item \textit{A straightforward implementation of this idea only
+      works if the operator is commutative!}
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+    Chunked reduction & $70\mu{}s$ & $103\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Using Atomics}
+
+  \textbf{The idea:} GPUs have special hardware support for performing
+  certain memory updates atomically.  In OpenCL, this is exposed
+  through \textit{atomic operations}.
+
+\begin{lstlisting}[backgroundcolor=\color{lightgray}]
+int atomic_add(volatile __global int *p,
+               int val)
+\end{lstlisting}
+
+  \begin{itemize}
+  \item Concise parallel reduction: each thread reads an element and
+    uses \texttt{atomic\_add()} to update the same location in memory.
+  \item \textbf{Why is this slow for large inputs?}
+  \end{itemize}
+
+\pause\bigskip
+
+  \begin{tabular}{lrr}
+    \textbf{Implementation} & $n=1000$ & $n=1000000$ \\\hline
+    Tree reduction & $77\mu{}s$ & $363\mu{}s$ \\
+    Group reduction & $17\mu{}s$ & $179\mu{}s$ \\
+    Chunked reduction & $70\mu{}s$ & $103\mu{}s$ \\
+    Atomics & $8\mu{}s$ & $1278\mu{}s$ \\
+  \end{tabular}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{For MSSP}
+
+  Implement three versions:
+
+  \begin{enumerate}
+  \item Tree reduction
+  \item Group reduction
+  \item Chunked reduction
+  \end{enumerate}
+
+  \textbf{Hints:}
+  \begin{itemize}
+  \item Instead of a \texttt{struct Qtup}, you may want to use
+    \texttt{int4} (inside the kernels) and \texttt{cl\_int4} (in host
+    code).
+  \item The MSSP operator is \textit{not} commutative, so you will
+    need to use a sliding window approach for the chunked reduction.
+  \item For the chunked reduction, you can fuse the \texttt{map}
+    function into the reduction itself.  For the others, a separate
+    pass is done.
+  \end{itemize}
+
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -540,10 +679,10 @@ Output: B = [a\mymath{\myindx{1}}, a\mymath{\myindx{1}}\mymath{\oplus}a\mymath{\
 
 \end{frame}
 
-\subsection{Exercise 2: Intra-Wave Scan Implementation}
+\subsection{Exercise 2: Intra-Wave Inclusive Scan Implementation}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 2: Intra-Wave Scan Implementation}
+  \frametitle{Exercise 2: Intra-Wave Inclusive Scan Implementation}
 
 \begin{columns}
 \column{0.46\textwidth}
@@ -567,7 +706,37 @@ Output: B = [a\mymath{\myindx{1}}, a\mymath{\myindx{1}}\mymath{\oplus}a\mymath{\
 \end{columns}
 
 \begin{itemize}
-    \item TODO: Cosmin should write exercise description here!!!
+    \item Open file "scanapps.cl", and implement function named "incScanWave" (follow the instructions)
+    \item Your {\tt n = WAVE} and {\tt k = lgWAVE}; Ignore the init. loop;
+    \item Unroll the {\tt for d} loop ({\tt \#pragma unroll});
+    \item loop {\tt forall i = h to n-1} is implicit,
+    \item it should be replace by a condition {\tt if (i>=h) \{ ... \}},
+    \item except that {\tt i} is not exactly the thread id.
+    \item Remember, you want to {\tt scan} each wave, independently!
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{OpenCL Scan Implementation}
+
+    BLACKBOARD!
+
+\begin{itemize}
+    \item CPU stub is in {\tt Day3-Exercises/ScanApps/scan.h}
+    \item Hierarchical design:
+    \item[1] sequentially scan {\tt ELEMS\_PER\_THREAD} by each thread,
+    \item[2] publish in local memory
+    \item[3] scan at wavefront level
+    \item[4] ``update'' the scan at workgroup level
+    \item[5] Gather the last elements in the scan groups into
+             a separate array, and scan that!
+    \item[5] Virtualize steps [1-4] so that the scan at step 5 fits
+             into one workgroup;
+    \item[6] add element {\tt i-1} of the result of step 5 
+                to each element of workgroup {\tt i} resulted from step $4$!
+    \item \red{This requires $2$ reads and $2$ writes from/to global memory.}\\
+          \emphh{Can you do it better?}
 \end{itemize}
 
 \end{frame}
@@ -591,6 +760,9 @@ X (input array)    {\tt~=[a0,~a1,~a2,~a3,~a4,~a5]}\\
 
 \emph{scatter} has $D(n)=\Theta(1)$ and $W(n)=\Theta(n)$,\\
 i.e., requires {\tt n} update operations ({\tt n} is the size of I or A, not of X!).\bigskip
+\bigskip
+
+{\bf replicate(n, v)} creates an array of length {\tt n} filled with element {\tt v}!
 
 \end{frame}
 
@@ -609,66 +781,64 @@ Partition2 receives as input a predicate and an array and results in:
 \end{itemize}\bigskip
 
 \begin{colorcode}
-bool odd(int v) \{ return (bool)(v & 1); \}
-partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
-             (3, [5, 3, 7, 4, 2, 10, 8])
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
 \end{colorcode}
 
 \end{frame}
 
 \begin{frame}[fragile,t]
-  \frametitle{Exercise 3, Step 1: Partition2 High-Level Implementation}
+  \frametitle{Exercise 3, Step 1: Partition2 High-Level Implem}
 
 \begin{colorcode}
-bool odd(int v) \{ return (bool)(v & 1); \}
-partition2( odd, [5, 4, 2, 10, 3, 7, 8] ) should result in
-             (3, [5, 3, 7, 4, 2, 10, 8])
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
 \end{colorcode}
 
-Step 1: implement partition2 based on map, scan and scatter (?)\pause
-
-TODO: Cosmin needs to write the implementation in a more imperative style!
+Step 1: implement partition2 based on map, scan and scatter (?)\bigskip
 
 \begin{columns}
 \column{0.59\textwidth}
 \begin{colorcode}
-let partition2 [n] (X : [n]i32) : 
-              ([n]i32, [n]i32) =
- let cs = map cond X
- let tfs= map (\mymath{\lambda}f->if f then 1 
-                        else 0) cs
- let isT= scan (+) 0 tfs
- let i  = isT[n-1]
+partition2(X: [n]i32): (i32, [n]i32) =
+ cs = map(even, X);
+ tfs= map (\mymath{\lambda}c->if c then 1 else 0
+          ,  cs);\pause
+ isT= scan( (+), 0, tfs );
+ i  = isT[n-1];
 
- let ffs= map (\mymath{\lambda}f->if f then 0 
-                        else 1) cs
- let isF= map (+i) (scan (+) 0 ffs)
- let inds=map (\mymath{\lambda}(c,iT,iF) -> 
-                  if c then iT-1 
-                       else iF-1
-              ) (zip cs isT isF)
- let res = scatter (scratch n) inds X
- in (i, res)
+ ffs= map (\mymath{\lambda}c->if c then 0 else 1
+          ,  cs );
+ tmps = scan( (+), 0, ffs );
+ isF= map (\mymath{\lambda}t -> t+i, tmps);
+
+ inds=map3(\mymath{\lambda}(c,iT,iF) -> 
+              if c then iT-1 else iF-1
+          , cs, isT, isF);
+ res = scatter(scratch n, inds, X);
+ return (i, res);
 \end{colorcode}
 \column{0.4\textwidth}\vspace{-2ex}
 \begin{colorcode}[fontsize=\scriptsize]
-Assume X = [5,4,2,3,7,8], and 
-cond is T(rue) for even nums.\pause
-n   = 6
-cs  = [F, T, T, F, F, T]
-tfs = [0, 1, 1, 0, 0, 1]
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{n   = 7}
+\emp{cs  = [F, T, T, T, F, F, T]}
+\emp{tfs = [0, 1, 1, 1, 0, 0, 1]}
 
-isT = [0, 1, 2, 2, 2, 3]
-i   = 3
+\emp{isT = [0, 1, 2, 3, 3, 3, 4]}
+\emp{i   = 4}
 
-ffs = [1, 0, 0, 1, 1, 0]
-isF = [4, 4, 4, 5, 6, 6]
+\emp{ffs = [1, 0, 0, 0, 1, 1, 0]}
+\emp{tmps= [1, 1, 1, 1, 2, 3, 3]}
+\emp{isF = [5, 5, 5, 5, 6, 7, 7]}
 
-inds= [3, 0, 1, 4, 5, 2]
-
-
-flags  = [3, 0, 0, 3, 0, 0]
-Result = [4, 2, 8, 5, 3, 7] 
+\emp{inds= [4, 0, 1, 2, 5, 6, 3]}
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{Res = [_, _, _, _, _, _, _]}
+\emp{---------------------------}
+\emp{Res = [4, 2, 10, 8,5, 3, 7]} 
 \end{colorcode}
 \end{columns}
 
@@ -682,7 +852,17 @@ Result = [4, 2, 8, 5, 3, 7]
   \frametitle{Exercise 3: Implement Partition2 in OpenCL}
 
 \begin{itemize}
-    \item TODO: Cosmin should write the exercise description here!!!
+    \item CPU stub is {\tt Day3-Exercises/ScanApps/partition2.h}, 
+            function {\tt runPartition}, but nothing to do there!\bigskip
+    \item[(1)] In {\tt Day3-Exercises/ScanApps/scanapps.cl}, implement
+             from scratch kernel {\tt mapPredPartKer} which is supposed 
+             to compute {\tt tfs} and {\tt ffs}.\bigskip
+    \item[(2)] the two scans are already implemented for you!\bigskip
+    \item[(3)] Then implement kernel {\tt scatterPartKer} which is supposed
+             to compute the last part! Note that {\tt isT} and {\tt isF}
+             are the results of {\tt scan}, i.e., {\tt isF} is actually {\tt tmps}
+             in slides!\\
+             It is Ok to redundantly compute the condition again.
 \end{itemize}
 
 \end{frame}
@@ -831,9 +1011,148 @@ Tup \mymath{\odot\myindu{sgm}}(Tup x, Tup y) \{
 \subsection{Application: Sparse Matrix-Vector Multiplication}
 
 \begin{frame}[fragile,t]
+  \frametitle{Sparse Matrix-Vector Multiplication: Pseudocode}
+
+\begin{colorcode}[fontsize=\scriptsize]
+smvMul( mat_cols: [N]int, mat_vals: [N]real
+      , vct: [vct_len], shape: [num_rows]int ) : [num_rows]real =
+  real res_vct[num_rows];
+  int  offset = 0;
+  for(int i=0; i < num_rows; i++) \{
+    real res = 0;
+    \emp{for(int j=offset; j < offset+shape[i]; j++) \{}
+        int vct_ind = mat_cols[j];
+        int mat_elm = mat_vals[j];
+        res += mat_elm * vct[vct_ind];
+    \}
+    res_vct[i] = res;
+    offset += shape[i];
+  \}
+\end{colorcode}
+
+\bigskip
+
+\begin{colorcode}[fontsize=\scriptsize]
+shape:    [2, 3, 1]
+mat_cols: [0,    1,    1,   2,    3,   3  ]
+mat_vals: [2.0, -1.0, -1.0, 2.0, -1.0, 3.0]
+vct:      [1.0,  2.0,  3.0, 4.0]
+-------------------------------------------\pause
+Result: 
+[ 2.0*1.0 + (-1.0)*2.0               = 0.0
+, (-1.0)*2.0 + 2.0*3.0 + (-1.0)*4.0  = 0.0
+, 3.0*4.0                            = 12.0
+]
+\end{colorcode}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
   \frametitle{Sparse Matrix-Vector Multiplication}
 
-TODO: COSMIN should continue here!!!
+Imperative Pseudocode:
+\begin{colorcode}[fontsize=\scriptsize]
+smvMul( mat_cols: [N]int, mat_vals: [N]real
+      , vct: [vct_len], shape: [num_rows]int ) : [num_rows]real =
+  real res_vct[num_rows];
+  int  offset = 0;
+  for(int i=0; i < num_rows; i++) \{
+    real res = 0;
+    \emp{for(int j=offset; j < offset+shape[i]; j++) \{}
+        int vct_ind = mat_cols[j];
+        int mat_elm = mat_vals[j];
+        res += mat_elm * vct[vct_ind];
+    \}
+    res_vct[i] = res;
+    offset += shape[i];
+  \}
+\end{colorcode}
+
+
+We would like to:
+\begin{itemize}
+    \item exploit all parallelism, \emp{but the inner parallelism is irregular!}
+    \item the inner loop:\pause looks like a map-reduce composition,\\
+            buts its size is variant to the outer {\tt map};
+    \item Hint: compute flags + use segmented scan + extract last elements! 
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Computing Flag Array from Shape Array}
+
+This works even in the presence of empty rows!\bigskip
+
+\begin{columns}
+\column{0.59\textwidth}
+\begin{colorcode}
+mkFlagArray (aoa_shp: [m]i32) : []i32 =
+  shp_rot = map (\mymath{\lambda}i->if i==0 then 0
+                      else aoa_shp[i-1]
+                , [0,...,m-1]);
+  shp_scn = scan( (+), 0, shp_rot );
+  aoa_len = shp_scn[m-1] + aoa_shp[m-1];
+  shp_ind = map2 (\mymath{\lambda}shp ind ->
+                   if shp==0 then -1
+                             else ind
+                 , aoa_shp, shp_scn);
+  return 
+    scatter( replicate(aoa_len, 0)
+           , shp_ind
+           , replicate(m, 1) );
+\end{colorcode}
+\column{0.4\textwidth}
+\begin{colorcode}[fontsize=\scriptsize]
+\emp{aoa_shp=[0,3,1,0,4,2,0]}\pause
+\emp{shp_rot=[0,0,3,1,0,4,2]}\pause
+
+\emp{shp_scn=[0,0,3,4,4,8,10]}\pause
+\emp{aoa_len= 10}
+
+\emp{shp_ind=} \pause
+      \emp{[-1,0,3,-1,4,8,-1]}
+\emp{scatter}\pause
+  \emp{[0,0,0,0,0,0,0,0,0,0]}
+  \emp{[-1,0,3,-1,4,8,-1]}
+  \emp{[1,1,1,1,1,1,1]}
+  \emp{---------------------}
+  \emp{[1,0,0,1,1,0,0,0,1,0]}
+\end{colorcode}
+\end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Flat-Parallel Sparse Matrix-Vector Mult}
+
+\emphh{Idea: use segmented scan, then extract last element in every row!}\\
+We assume no rows of length 0, and also inline flag computation.
+
+\begin{colorcode}
+smvMul( mat_cols: [N]int       \emp{// [0,    1,    1,   2,    3,   3  ]}
+      , mat_vals: [N]real      \emp{// [2.0, -1.0, -1.0, 2.0, -1.0, 3.0]}
+      , vct: [vct_len]         \emp{// [1.0,  2.0,  3.0, 4.0]}
+      , shape: [num_rows]int ) \emp{// [2,    3,    1]}
+      : [num_rows]real =       \emp{// Expected: [0.0, 0.0, 12.0]}
+  \blue{shpscn= scan( (+), 0, shape );}       \emp{// [2, 5, 6]}
+  \emphh{len   = shpscn[num_rows-1];}
+  \emphh{ones  = replicate(num_rows, 1);}      \emp{// [1, 1, 1]}
+  \emphh{indm1 = map(\mymath{\lambda} i -> if i==0 then 0}
+                     \emphh{else shpscn[i-1]}
+                    \emphh{, [0...num_rows]);} \emp{// [0, 2, 5]}
+  \emphh{flags = scatter( replicate(len, 0)}   \emp{// [0, 0, 0, 0, 0, 0]}
+                 \emphh{, indm1}              
+                 \emphh{, ones );}     \emp{// [1,    0,    1,   0,    0,   1  ]}
+  \red{prods = map2(\mymath{\lambda}col v ->}       \emp{// [2.0, -2.0, -2.0, 6.0, -4.0, 12.0]} 
+                    \red{v * vct[col]} 
+              \red{, mat_cols, mat_vals );}
+  \orange{scnarr= sgmScan\mymath{\myindu{inc}}( (+), 0}
+              \orange{, flags, prods);} \emp{// [2.0, 0.0, -2.0, 4.0, 0.0, 12.0]}\pause
+  return                       \emp{// [scnarr[1], scn_arr[4], scn_arr[5]]}
+    \purple{map(\mymath{\lambda} ind -> scnarr[ind-1];}
+       \purple{, shpscn );}             \emp{// [0.0, 0.0, 12.0]}
+\end{colorcode}
 
 \end{frame}
 
@@ -842,9 +1161,163 @@ TODO: COSMIN should continue here!!!
 \begin{frame}[fragile,t]
   \frametitle{Exercise 4: Sparse Matrix-Vector Mult in OpenCL}
 
-TODO: COSMIN should continue here!!!
+\begin{itemize}
+    \item the CPU stub is in {\tt Day3-Exercises/ScanApps/spMatVecMult.h}, function {\tt runSpMatVectMul};
+            nothing to do there! You only need to implement several kernels in {\tt scanapps.cl}.\smallskip
+    \item[(1)] \blue{\tt shpscn= scan( (+), 0, shape );}\\ is already implemented!
+    \item[(2)] \emphh{Implement kernel {\tt mkFlagsSpMVM}.} Array {\tt flags} has been already zeroed;
+                {\tt shape\_scn} is {\tt shpscn} in the previous slide.\smallskip
+    \item[(3)] \red{Implement kernel {\tt mulPhaseSpMVM}.}\\ 
+                {\tt mat\_ind} is {\tt mat\_cols} from the previous slide.\smallskip
+    \item[(4)] \orange{\tt scnarr= sgmScan\mymath{\myindu{inc}}( (+), 0, flags, prods);}\\
+            is already implemented!\smallskip
+    \item[(5)] \purple{Implement kernel{\tt getLastSpMVM}.}\\ {\tt shape\_scn} and
+                {\tt sgm\_mat} are {\tt shpscn} and {\tt scnarr} in previous slide,
+                respectively, and {\tt out} is the result. 
+\end{itemize}
 
 \end{frame}
 
+\section{Optimized Partition2}
+
+\begin{frame}
+  \tableofcontents[currentsection]
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Back To Partition2}
+
+\begin{columns}
+\column{0.59\textwidth}
+\begin{colorcode}
+partition2(X: [n]i32): (i32, [n]i32) =
+ cs = map(even, X);
+ tfs= map (\mymath{\lambda}c->if c then 1 else 0
+          ,  cs);
+ isT= scan( (+), 0, tfs );
+ i  = isT[n-1];
+
+ ffs= map (\mymath{\lambda}c->if c then 0 else 1
+          ,  cs );
+ tmps = scan( (+), 0, ffs );
+ isF= map (\mymath{\lambda}t -> t+i, tmps);
+
+ inds=map3(\mymath{\lambda}(c,iT,iF) -> 
+              if c then iT-1 else iF-1
+          , cs, isT, isF);
+ res = scatter(scratch n, inds, X);
+ return (i, res);
+\end{colorcode}
+\column{0.4\textwidth}\vspace{-2ex}
+\begin{colorcode}[fontsize=\scriptsize]
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{n   = 7}
+\emp{cs  = [F, T, T, T, F, F, T]}
+\emp{tfs = [0, 1, 1, 1, 0, 0, 1]}
+
+\emp{isT = [0, 1, 2, 3, 3, 3, 4]}
+\emp{i   = 4}
+
+\emp{ffs = [1, 0, 0, 0, 1, 1, 0]}
+\emp{tmps= [1, 1, 1, 1, 2, 3, 3]}
+\emp{isF = [5, 5, 5, 5, 6, 7, 7]}
+
+\emp{inds= [4, 0, 1, 2, 5, 6, 3]}
+\emp{X   = [5, 4, 2, 10,3, 7, 8]}
+\emp{Res = [_, _, _, _, _, _, _]}
+\emp{---------------------------}
+\emp{Res = [4, 2, 10, 8,5, 3, 7]} 
+\end{colorcode}
+\end{columns}
+\bigskip
+
+This shows you how to think about it, but a direct 
+implementation is not very efficient in practice.
+
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Partition2: Taking Inspiration From Scan}
+
+\begin{colorcode}
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
+\end{colorcode}
+
+A scan implementation is typically split into three kernels:\medskip
+\begin{itemize}
+    \item[(1)] reduce at workgroup level (with sequential chunking);\medskip
+    \item[(2)] scan the results of (1) in one workgroup; this is typically
+                negligible, as it is applied on few elements;\medskip
+    \item[(3)] perform the workgroup level scan while starting from the
+                result of the previous workgroup.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Partition2: Deriving an Optimized Implementation}
+
+\begin{colorcode}
+bool even(int v) \{ return (bool)(1 -(v&1)); \}
+partition2(even, [5, 4, 2, 10, 3, 7, 8] ) should result in
+             (4, [4, 2, 10, 8, 5, 3, 7])
+\end{colorcode}
+\smallskip
+
+\begin{scriptsize}
+\begin{itemize}
+    \item[(I)] map-reduce at workgroup level; operator is commutative!
+        \begin{itemize}
+           \item[(a)] \begin{scriptsize}{\tt X = map($\lambda$(e)-> if pred(e) then (1,0) else (0,1), A);}
+                      \end{scriptsize}
+           \item[(b)] \begin{scriptsize}{\tt reduce$^{wkgp}$($\lambda$((a1,b1),(a2,b2))->(a1+b2, b1+b2)),(0,0),X);}
+                      \end{scriptsize}
+        \end{itemize}\smallskip
+    \item[(II)] scan the results of (I) in one workgroup; after this step we know 
+                the global offsets of the elements that succeed/fail at the start
+                of each workgroup.\smallskip
+    \item[(III)] Do all the rest in one kernel:
+        \begin{itemize}
+        \begin{scriptsize}
+            \item[(1)] Copy {\tt ELEMS\_PER\_THREAD} from global to local memory, coalesced (ToDo).\smallskip
+            \item[(2)] Save them in per-thread register memory ({\tt chunk}) +\\
+                        Reduce sequentially each thread's {\tt ELEMS\_PER\_THREAD}
+                        elems in {\tt tf}; (ToDo).\smallskip
+            \item[(3)] Perform workgroup-level scan on the {\tt tf} of each thread (DONE).\smallskip
+            \item[(4)] The number of elements that succeed/fail per workgroup 
+                        ({\tt num\_ts/num\_fs}) is the last scanned element (DONE).\smallskip
+            \item[(5)] Save in {\tt tf} the result of the previous thread (DONE).\smallskip
+            \item[(6)] Redo computation (2) but instead place the elements from 
+                        register to local memory in the order in which they would occur
+                        if the partition was done at workgroup level; remember to add 
+                        {\tt num\_ts} to the failed-elems index (ToDo).\smallskip
+            \item[(7)] Finally copy-out from local to global memory in coalesced fashion (DONE).
+        \end{scriptsize}
+        \end{itemize}
+\end{itemize}
+\end{scriptsize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+  \frametitle{Last Exercise: Optimized Partition2}
+
+\begin{itemize}
+    \item CPU stub: in file {\tt Day3-Exercises/Partition2Opt/partition2.h}, function {\tt runPartition};
+            that is where the OpenCL kernels are called, but nothing to do there.\bigskip
+
+    \item Open in file {\tt Day3-Exercises/Partition2Opt/kernels.cl}, kernel {\tt scanPhaseKer}. 
+            Follow the instructions, which correspond to implementing the ToDo items from
+            the previous slide.\bigskip
+
+    \item The performance of the optimized partition2 should come close to that of inclusive scan!
+\end{itemize}
+
+\end{frame}
 
 \end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

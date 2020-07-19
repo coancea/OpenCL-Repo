@@ -108,6 +108,7 @@ void profileScan(IncScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
+        cleanUpBuffer(arrs.N, arrs.out);
     }
 }
 
@@ -120,7 +121,8 @@ cl_int runSgmScan(SgmScanBuffs arrs) {
     const uint32_t num_groups      = getScanNumGroups(arrs.N);
     const uint32_t elems_per_group0= (arrs.N + num_groups - 1) / num_groups;
     const uint32_t min_elem_per_group = WORKGROUP_SIZE * ELEMS_PER_THREAD;
-    const uint32_t elems_per_group = ((elems_per_group0 + min_elem_per_group - 1) / min_elem_per_group) * min_elem_per_group;
+    const uint32_t elems_per_group = ((elems_per_group0 + min_elem_per_group - 1) / min_elem_per_group) *
+                                     min_elem_per_group;
 
     //printf("Number of groups: %d, Number elements per group: %d\n\n", num_groups, elems_per_group);
 
@@ -200,6 +202,7 @@ void profileSgmScan(SgmScanBuffs arrs, ElTp* ref_arr, ElTp* res_arr) {
         gpuToCpuTransfer(arrs.N, arrs.out, res_arr);
         validate(ref_arr, res_arr, arrs.N);
         memset(res_arr, 0, arrs.N*sizeof(ElTp));
+        cleanUpBuffer(arrs.N, arrs.out);
     }
 }
 
