@@ -80,8 +80,8 @@ incScanGroup ( __local volatile ElTp*   sh_data, const size_t tid) {
     // perform scan at warp level
     ElTp res = incScanWarp(sh_data, tid);
 
-	// optimize for when the workgroup-size is exactly one WAVE
-	if(get_local_size(0) == WARP) { return res; }
+    // optimize for when the workgroup-size is exactly one WAVE
+    if(get_local_size(0) == WARP) { return res; }
 
     barrier(CLK_LOCAL_MEM_FENCE);
 

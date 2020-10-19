@@ -396,6 +396,32 @@ __kernel void singlePassScanKer (
                     prefix = incprefix[WG_ID-1];
                 }
             } else {
+#if 0
+                ElTp aggr = NE;
+                mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE);
+                if(tid == 0) {
+                    bool goOn = true;
+                    while(goOn) {
+                        aggr = NE;
+                        int index = WG_ID - 1;
+                        //mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE); 
+                        volatile uint8_t flg = statusflgs[index];
+                        
+                        while ((flg != STATUS_A) && (index > 0)) {
+                            aggr = binOp(aggr, incprefix[index]);
+                            index--;
+                            //mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE); 
+                            flg = statusflgs[index];
+                        }
+                        if (statusflgs[index] == STATUS_P) goOn = false;
+                        
+                        //mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE); 
+                    }
+                    prefix = aggr;
+                    //mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE);
+                }
+                mem_fence(CLK_GLOBAL_MEM_FENCE | CLK_LOCAL_MEM_FENCE);
+#else
                 int32_t read_offset = WG_ID - WARP;
                 int32_t LOOP_STOP = -WARP;
 
@@ -442,7 +468,9 @@ __kernel void singlePassScanKer (
                     mem_fence(CLK_LOCAL_MEM_FENCE);
                     read_offset = block_id[0];
                 } // END WHILE loop
+#endif
             } // END ELSE branch of if (stat1 == STATUS_P)
+
             if(tid == 0) {
                 // publish the prefix of the current workgroup
                 incprefix[WG_ID] = binOp(prefix, acc);

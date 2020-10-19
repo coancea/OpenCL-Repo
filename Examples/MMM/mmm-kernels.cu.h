@@ -196,6 +196,194 @@ __global__ void mmmTnRn(ElTp* A, ElTp* B, ElTp* C, int heightA, int widthB, int 
   }
 }
 
+
+template <class ElTp, int Ty, int Ry, int Tx, int Rx, int Tk>
+__global__ void mmmTnRn_Play(ElTp* A, ElTp* B, ElTp* C, int heightA, int widthB, int widthA) {
+  __shared__ ElTp Aloc[Ty*Ry][Tk];
+  __shared__ ElTp Bloc[Tk][Tx*Rx]; 
+  ElTp css[Ry][Rx];
+  ElTp as[Ry];
+  ElTp bs[Rx];
+
+  unsigned int iii = blockIdx.y * Ty * Ry;
+  unsigned int jjj = blockIdx.x * Tx * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++)
+    #pragma unroll
+    for(int j=0; j<Rx; j++)
+      css[i][j] = 0.0;
+
+  for(int kk = 0; kk < widthA; kk += Tk) {
+
+      // copy the slice of A: Ashreg = A[iii : iii + Ty*Ry , kk : kk+Tk]
+      //   such that the accesses to A and Aloc are both coalesced!
+      for(int i = threadIdx.y; i < Ty*Ry; i+=Ty) {
+          for(int k = threadIdx.x; k < Tk; k+=Tx) {
+              ElTp v = 3.0;
+              if ( (iii+i < heightA) && (kk+k < widthA) )
+                  v = A[(iii+i)*widthA + (kk+k)];
+              Aloc[i][k] = v;
+          }
+      }
+
+      // copy the slice of B: Bshreg = B[kk : kk+Tk , jjj : jjj + Tx*Rx]
+      //   such that the accesses to B and Bloc are both coalesced!
+      for(int k = threadIdx.y; k < Tk; k+=Ty) {
+          for(int j = threadIdx.x; j < Tx*Rx; j+=Tx) {
+              ElTp v = 5.0;
+              if ( (jjj+j < widthB) && (kk+k < widthA) )
+                  v = B[(kk+k)*widthB + (jjj + j)];
+              Bloc[k][j] = v;
+          }
+      }
+      __syncthreads();
+
+      for(int k = 0; k < Tk; k++) {
+          // copy from local to register memory for A
+          #pragma unroll
+          for(int i = 0; i < Ry; i++) {
+              as[i] = Aloc[threadIdx.y*Ry+i][k];
+          }
+          // copy from local to register memory for B
+          #pragma unroll
+          for(int j = 0; j < Rx; j++) {
+              bs[j] = Bloc[k][threadIdx.x*Rx+j];
+          }
+
+          #pragma unroll
+          for(int i=0; i<Ry; i++) {
+            #pragma unroll
+            for(int j=0; j<Rx; j++) {
+                ElTp ctrb = 0;
+                if ( (iii+threadIdx.y*Ry+i < heightA) &&
+                     (jjj+threadIdx.x*Rx+j < widthB) &&
+                     (kk + k < widthA) 
+                   )
+                     ctrb = as[i] * bs[j];
+                else ctrb = 0;
+                css[i][j] += ctrb;
+            }
+          }
+      }
+      __syncthreads();
+  }
+
+  unsigned int indy = iii + threadIdx.y * Ry;
+  unsigned int indx = jjj + threadIdx.x * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++) {
+    #pragma unroll
+    for(int j=0; j<Rx; j++) {
+      if( (indy+i < heightA) && (indx+j < widthB) )
+        C[(indy+i)*widthB + (indx+j)] = css[i][j];
+    }
+  }
+}
+
+
+template <class ElTp, int Ty, int Ry, int Tx, int Rx, int Tk>
+__global__ void mmmTnRn_Proto(ElTp* A, ElTp* B, ElTp* C, int heightA, int widthB, int widthA) {
+  __shared__ ElTp Aloc[Ty*Ry][Tk];
+  __shared__ ElTp Bloc[Tk][Tx*Rx];  
+  ElTp css[Ry][Rx];
+  ElTp as[Ry];
+  ElTp bs[Rx];
+
+  unsigned int iii = blockIdx.y * Ty * Ry;
+  unsigned int jjj = blockIdx.x * Tx * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++)
+    #pragma unroll
+    for(int j=0; j<Rx; j++)
+      css[i][j] = 0.0;
+
+  for(int kk = 0; kk < widthA; kk += Tk) {
+
+      // copy the slice of A: Ashreg = A[iii : iii + Ty*Ry , kk : kk+Tk]
+      //   such that the accesses to A and Aloc are both coalesced!
+
+      //for(int i = threadIdx.y; i < Ty*Ry; i+=Ty) {
+      unsigned int Tk_div_Tx = (Tk + Tx - 1) / Tx;
+      for(int i = 0; i < Ry; i++) {
+          for(int k0 = 0; k0 < Tk_div_Tx; k0++) {
+          //for(int k = threadIdx.x; k < Tk; k+=Tx) {
+              int k = threadIdx.x + k0*Tx;
+              ElTp v = 3.0;
+              unsigned int my_i = iii + i*Ty + threadIdx.y;
+              if ( (my_i < heightA) && (kk+k < widthA) )
+                  v = A[my_i*widthA + (kk+k)];
+              if (k < Tk)
+                Aloc[i*Ty+threadIdx.y][k] = v;
+          }
+      }
+
+      // copy the slice of B: Bshreg = B[kk : kk+Tk , jjj : jjj + Tx*Rx]
+      //   such that the accesses to B and Bloc are both coalesced!
+      unsigned int Tk_div_Ty = (Tk + Ty - 1) / Ty;
+      //for(int k = threadIdx.y; k < Tk; k+=Ty) {
+      for(int k0 = 0; k0 < Tk_div_Ty; k0++) {
+          int k = k0*Ty + threadIdx.y;
+          //for(int j = threadIdx.x; j < Tx*Rx; j+=Tx) {
+          for(int j = 0; j < Rx; j ++) {
+              int loc_j = threadIdx.x + j*Tx;
+              ElTp v = 5.0;
+              if ( (jjj+loc_j < widthB) && (kk+k < widthA) )
+                  v = B[(kk+k)*widthB + (jjj + loc_j)];
+
+              if( k < Tk)
+                  Bloc[k][loc_j] = v;
+          }
+      }
+      __syncthreads();
+
+      for(int k = 0; k < Tk; k++) {
+          // copy from local to register memory for A
+          #pragma unroll
+          for(int i = 0; i < Ry; i++) {
+              as[i] = Aloc[threadIdx.y*Ry+i][k];
+          }
+
+          // copy from local to register memory for B
+          #pragma unroll
+          for(int j = 0; j < Rx; j++) {
+              bs[j] = Bloc[k][threadIdx.x*Rx+j];
+          }
+
+          #pragma unroll
+          for(int i=0; i<Ry; i++) {
+            #pragma unroll
+            for(int j=0; j<Rx; j++) {
+                ElTp ctrb = 0;
+                if ( (iii+threadIdx.y*Ry+i < heightA) &&
+                     (jjj+threadIdx.x*Rx+j < widthB) &&
+                     (kk + k < widthA) 
+                   )
+                     ctrb = as[i] * bs[j];
+                else ctrb = 0;
+                css[i][j] += ctrb;
+            }
+          }
+      }
+      __syncthreads();
+  }
+
+  unsigned int indy = iii + threadIdx.y * Ry;
+  unsigned int indx = jjj + threadIdx.x * Rx;
+
+  #pragma unroll
+  for(int i=0; i<Ry; i++) {
+    #pragma unroll
+    for(int j=0; j<Rx; j++) {
+      if( (indy+i < heightA) && (indx+j < widthB) )
+        C[(indy+i)*widthB + (indx+j)] = css[i][j];
+    }
+  }
+}
+
+
 /************************************************/
 /*** All Dims Parallelized, including Redomap ***/
 /************************************************/

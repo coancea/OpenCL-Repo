@@ -7,8 +7,8 @@
 #include "mmm-kernels.cu.h"
 
 #define GPU_RUNS    100
-#define SMALL       1
-#define LONGINNER   1
+#define SMALL       0
+#define LONGINNER   0
 
 #if SMALL
 
@@ -40,17 +40,31 @@
 
 #else
 
-    #define WIDTH_A  1024//1024 //1024//2048
-    #define HEIGHT_A 1024//2048//2048//2048
-    #define WIDTH_B  1024//4096//2048
+#if 1
+    #define WIDTH_A  4096//1024 //(1024+17)//1024 //1024//2048
+    #define HEIGHT_A 2048//1024 //(1024+19)//2048//2048//2048
+    #define WIDTH_B  2048//1024 //(1024+23)//4096//2048
     #define TILE     16//16
 
     #define Ty  16
-    #define Tx  32
+    #define Tx  16
     #define Ry  4
     #define Rx  4
-    #define Tk  32
+    #define Tk  16
     #define Rk  32
+#else
+    #define WIDTH_A  (1024+17)//1024 //1024//2048
+    #define HEIGHT_A (1024+19)//2048//2048//2048
+    #define WIDTH_B  (1024+23)//4096//2048
+    #define TILE     16//16
+
+    #define Ty  16
+    #define Tx  27
+    #define Ry  5
+    #define Rx  5
+    #define Tk  19
+    #define Rk  32
+#endif
 
 #endif 
 
@@ -90,7 +104,7 @@ void matMult(T* A, T* B, T* C, int colsA, int rowsA, int colsB) {
 template<class T>
 bool validate(float* A,float* B, unsigned int sizeAB){
     for(int i = 0; i < sizeAB; i++)
-      if (fabs(A[i] - B[i]) > 0.0005){
+      if (fabs(A[i] - B[i]) > 0.0007){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
         return false;
       }
@@ -139,6 +153,8 @@ int main() {
    float *d_C;
    cudaMalloc((void**) &d_C, mem_size_C);
  
+   printf("Sizes are: (HeightA, WidthB, WidthA)=(%d, %d, %d)\n", HEIGHT_A, WIDTH_B, WIDTH_A);
+
    // 7. compute sequential matrix multiplication
    {
       unsigned long int elapsed;
@@ -355,14 +371,14 @@ int main() {
       // copy result from device to host
       cudaMemcpy(h_C, d_C, mem_size_C, cudaMemcpyDeviceToHost);
       // validate
-      printf("GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) MMM version ... ");
+      printf("GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) Par-Inner MMM version ... ");
       validate<float>(seq_C, h_C, size_C);
 
-      printf("GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) MMM version runs in: %lu microsecs\n", elapsed);
+      printf("GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) Par-Inner MMM version runs in: %lu microsecs\n", elapsed);
       float microsecPerMatrixMul = elapsed; 
       double flopsPerMatrixMul = 2.0 * HEIGHT_A * WIDTH_B * WIDTH_A; 
       double gigaFlops = (flopsPerMatrixMul * 1.0e-9f) / (microsecPerMatrixMul / (1000.0f * 1000.0f)); 
-      printf( "GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) MMM Performance= %.2f GFlop/s, Time= %.3f microsec %d %d\n", gigaFlops, microsecPerMatrixMul, grid.x, grid.y); 
+      printf( "GPU B+R Tiled(Ty,Ry,Tx,Rx,Tk) Par-Inner MMM Performance= %.2f GFlop/s, Time= %.3f microsec %d %d\n", gigaFlops, microsecPerMatrixMul, grid.x, grid.y); 
    }
 
 

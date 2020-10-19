@@ -31,9 +31,13 @@ OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
 
+#define MAX(i,j) ((i)<(j)) ? (j) : (i)
+
 int32_t getNumElemPerThread() {
     float num = (ELEMS_PER_THREAD * 4.0) / sizeof(ElTp);
-    return (int32_t) num;
+    int res = MAX((int32_t) num, 1);
+    //printf("ELEM_PER_THREADs passed to OpenCL: %d\n", res);
+    return res;
 }
 
 size_t getNumBlocks(const uint32_t N) {
