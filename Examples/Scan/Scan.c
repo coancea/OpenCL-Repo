@@ -2,8 +2,8 @@
 #include <stdbool.h>
 #include <math.h>
 
-#define REPEAT              200
-#define ELEMS_PER_THREAD    9//9
+#define REPEAT              800
+#define ELEMS_PER_THREAD    11//9
 
 #include "GenericHack.h"
 #include "SetupOpenCL.h"
