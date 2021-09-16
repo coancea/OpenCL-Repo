@@ -6,7 +6,7 @@ PROGRAMS=Scan
 
 all: $(PROGRAMS)
 
-%: %.c ../../clutils.h
+%: %.c ../../clutils.h GenericHack.h Scan.c SetupOpenCL.h
 	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
 
 .PHONY: clean

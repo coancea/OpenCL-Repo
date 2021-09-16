@@ -206,7 +206,7 @@ incSgmScanWarp  ( __local volatile uint8_t* sh_flag
 }
 
 inline void 
-incScanGroup ( __local volatile ElTp* sh_data, const size_t th_id) {
+incScanGroup0 ( __local volatile ElTp* sh_data, const size_t th_id) {
     ElTp res;
     #pragma unroll
     for(uint32_t i=0; i<logWORKGROUP_SIZE; i++) {
@@ -219,7 +219,7 @@ incScanGroup ( __local volatile ElTp* sh_data, const size_t th_id) {
 }  
  
 inline void 
-incScanGroup0 ( __local volatile ElTp*   sh_data, const size_t tid) {
+incScanGroup ( __local volatile ElTp*   sh_data, const size_t tid) {
     const size_t lane   = tid & (WARP-1);
     const size_t warpid = tid >> lgWARP;
 
