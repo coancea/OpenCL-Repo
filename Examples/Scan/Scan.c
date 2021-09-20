@@ -3,7 +3,7 @@
 #include <math.h>
 
 #define REPEAT              800
-#define ELEMS_PER_THREAD    11//9
+#define ELEMS_PER_THREAD    23//9
 
 #include "GenericHack.h"
 #include "SetupOpenCL.h"

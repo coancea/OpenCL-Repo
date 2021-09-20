@@ -8,7 +8,7 @@ typedef int32_t     ElTp;
 
 #define logWORKGROUP_SIZE   10
 //#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
-#define WORKGROUP_SIZE      1024//128
+#define WORKGROUP_SIZE      512//1024//128
 
 typedef struct FlgTup {
     uint8_t flg;

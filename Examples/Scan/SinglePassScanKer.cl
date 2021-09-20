@@ -300,6 +300,28 @@ incSgmScanGroup0( __local volatile uint8_t* sh_flag
     barrier(CLK_LOCAL_MEM_FENCE);
 }  
 
+
+inline void
+warpScanSpecial ( __local volatile uint8_t* sh_flag
+                , __local volatile int32_t* sh_data
+                , const size_t th_id
+) {
+    const size_t lane = th_id & (WARP-1);
+    #pragma unroll
+    for(uint32_t i=0; i<lgWARP; i++) {
+        const uint32_t p = (1<<i);
+        if( lane >= p ) {
+            uint8_t f1 = sh_flag[th_id-p]; int32_t v1 = sh_data[th_id-p];
+            uint8_t f2 = sh_flag[th_id  ]; int32_t v2 = sh_data[th_id  ];
+
+            uint8_t f; int32_t v;
+            if(f2 == 2 || f2 == 0) { f = f2; v = v2;}
+            else                   { f = f1; v = v1 + v2; }
+
+            sh_flag[th_id] = f; sh_data[th_id] = v;
+        }
+    }
+}
 __kernel void singlePassScanKer ( 
         uint32_t            N,
         __global ElTp*      d_inp,      // read-only,  [N]
@@ -443,6 +465,28 @@ __kernel void singlePassScanKer (
                             used = 1;
                         }
                     }
+#if 1
+                    exchange[tid]       = aggr;
+                    warpscan[tid]       = flag;
+
+                    if(warpscan[WARP-1] != STATUS_P)
+                        warpScanSpecial ( warpscan, exchange, tid);
+                    flag = warpscan[WARP-1];
+                    aggr = exchange[WARP-1];
+
+                    // now we have performed the scan; advance only if flag is not 0
+                    if (flag == STATUS_P) {
+                        read_offset = LOOP_STOP;
+                    } else if (flag == STATUS_A) {
+                        read_offset = read_offset - WARP;
+                    }
+                    if (flag != STATUS_X) {
+                        prefix = binOp(aggr, prefix);             
+                    }
+
+                    mem_fence(CLK_LOCAL_MEM_FENCE);
+
+#else
                     exchange[tid]       = aggr;
                     warpscan[tid]       = mkStatusUsed(used, flag);
                     mem_fence(CLK_LOCAL_MEM_FENCE);
@@ -467,6 +511,7 @@ __kernel void singlePassScanKer (
                     }
                     mem_fence(CLK_LOCAL_MEM_FENCE);
                     read_offset = block_id[0];
+#endif
                 } // END WHILE loop
 #endif
             } // END ELSE branch of if (stat1 == STATUS_P)
