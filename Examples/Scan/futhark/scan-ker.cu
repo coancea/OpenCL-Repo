@@ -3064,6 +3064,8 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     }
 }
 
+#define MM 11
+
 __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                     uint local_mem_4602_backing_offset_0,
                                     int64_t n_4547, __global
@@ -3112,7 +3114,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     
     local_mem_4602 = (__local unsigned char *) local_mem_4602_backing_0;
     
-    int64_t trans_arr_len_4603 = (int64_t) 12 * segscan_group_sizze_4556;
+    int64_t trans_arr_len_4603 = (int64_t) MM * segscan_group_sizze_4556;
     int32_t dynamic_id_4610;
     
     if (local_tid_4594 == 0) {
@@ -3125,20 +3127,20 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     dynamic_id_4610 = ((__local int32_t *) local_mem_4602)[(int64_t) 0];
     barrier(CLK_LOCAL_MEM_FENCE);
     
-    int64_t blockOff_4611 = sext_i32_i64(dynamic_id_4610) * (int64_t) 12 *
+    int64_t blockOff_4611 = sext_i32_i64(dynamic_id_4610) * (int64_t) MM *
             segscan_group_sizze_4556;
     int64_t sgm_idx_4612 = smod64(blockOff_4611, n_4547);
-    int32_t boundary_4613 = sext_i64_i32(smin64((int64_t) 12 *
+    int32_t boundary_4613 = sext_i64_i32(smin64((int64_t) MM *
                                                 segscan_group_sizze_4556,
                                                 n_4547 - sgm_idx_4612));
-    int32_t segsizze_compact_4614 = sext_i64_i32(smin64((int64_t) 12 *
+    int32_t segsizze_compact_4614 = sext_i64_i32(smin64((int64_t) MM *
                                                         segscan_group_sizze_4556,
                                                         n_4547));
-    float private_mem_4615[(int64_t) 12];
+    float private_mem_4615[(int64_t) MM];
     
     // Load and map
     {
-        for (int64_t i_4617 = 0; i_4617 < (int64_t) 12; i_4617++) {
+        for (int64_t i_4617 = 0; i_4617 < (int64_t) MM; i_4617++) {
             int64_t phys_tid_4618 = blockOff_4611 +
                     sext_i32_i64(local_tid_4594) + i_4617 *
                     segscan_group_sizze_4556;
@@ -3158,7 +3160,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     // Transpose scan inputs
     {
         barrier(CLK_LOCAL_MEM_FENCE);
-        for (int64_t i_4621 = 0; i_4621 < (int64_t) 12; i_4621++) {
+        for (int64_t i_4621 = 0; i_4621 < (int64_t) MM; i_4621++) {
             int64_t sharedIdx_4622 = sext_i32_i64(local_tid_4594) + i_4621 *
                     segscan_group_sizze_4556;
             
@@ -3166,8 +3168,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 private_mem_4615[i_4621];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-        for (int32_t i_4623 = 0; i_4623 < 12; i_4623++) {
-            int32_t sharedIdx_4624 = local_tid_4594 * 12 + i_4623;
+        for (int32_t i_4623 = 0; i_4623 < MM; i_4623++) {
+            int32_t sharedIdx_4624 = local_tid_4594 * MM + i_4623;
             
             private_mem_4615[sext_i32_i64(i_4623)] = ((__local
                                                        float *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
@@ -3176,7 +3178,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
     // Per thread scan
     {
-        int32_t gidx_4625 = local_tid_4594 * 12 + 1;
+        int32_t gidx_4625 = local_tid_4594 * MM + 1;
         
         for (int64_t i_4626 = 0; i_4626 < (int64_t) 11; i_4626++) {
             if (!0) {
@@ -3584,7 +3586,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             }
             if (local_tid_4594 == 0) {
                 if (boundary_4613 == sext_i64_i32(segscan_group_sizze_4556 *
-                    (int64_t) 12)) {
+                    (int64_t) MM)) {
                     float x_4657 = prefix_4637;
                     float x_4658 = acc_4630;
                     float defunc_1_op_res_4659 = x_4657 + x_4658;
@@ -3618,7 +3620,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         float x_4663 = prefix_4637;
         float x_4664 = acc_4630;
         
-        if (slt32(local_tid_4594 * 12, boundary_4613) && !block_new_sgm_4638) {
+        if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
             float defunc_1_op_res_4665 = x_4663 + x_4664;
             
             x_4660 = defunc_1_op_res_4665;
@@ -3627,10 +3629,10 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
         
         int32_t stopping_point_4666 = segsizze_compact_4614 -
-                srem32(local_tid_4594 * 12 - 1 + segsizze_compact_4614 -
+                srem32(local_tid_4594 * MM - 1 + segsizze_compact_4614 -
                        boundary_4613, segsizze_compact_4614);
         
-        for (int64_t i_4667 = 0; i_4667 < (int64_t) 12; i_4667++) {
+        for (int64_t i_4667 = 0; i_4667 < (int64_t) MM; i_4667++) {
             if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
                 x_4661 = private_mem_4615[i_4667];
                 
@@ -3643,14 +3645,14 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     // Transpose scan output
     {
         barrier(CLK_LOCAL_MEM_FENCE);
-        for (int64_t i_4668 = 0; i_4668 < (int64_t) 12; i_4668++) {
-            int64_t sharedIdx_4669 = sext_i32_i64(local_tid_4594 * 12) + i_4668;
+        for (int64_t i_4668 = 0; i_4668 < (int64_t) MM; i_4668++) {
+            int64_t sharedIdx_4669 = sext_i32_i64(local_tid_4594 * MM) + i_4668;
             
             ((__local float *) local_mem_4602)[sharedIdx_4669] =
                 private_mem_4615[i_4668];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
-        for (int64_t i_4670 = 0; i_4670 < (int64_t) 12; i_4670++) {
+        for (int64_t i_4670 = 0; i_4670 < (int64_t) MM; i_4670++) {
             int32_t sharedIdx_4671 = local_tid_4594 +
                     sext_i64_i32(segscan_group_sizze_4556 * i_4670);
             
@@ -3661,7 +3663,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
     // Write block scan results to global memory
     {
-        for (int64_t i_4672 = 0; i_4672 < (int64_t) 12; i_4672++) {
+        for (int64_t i_4672 = 0; i_4672 < (int64_t) MM; i_4672++) {
             int64_t flat_idx_4673 = blockOff_4611 + segscan_group_sizze_4556 *
                     i_4672 + sext_i32_i64(local_tid_4594);
             int64_t slice_4674 = n_4547;
@@ -3677,7 +3679,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     // If this is the last block, reset the dynamicId
     {
         if (dynamic_id_4610 == sdiv_up64(n_4547, segscan_group_sizze_4556 *
-                                         (int64_t) 12) - (int64_t) 1) {
+                                         (int64_t) MM) - (int64_t) 1) {
             ((__global int32_t *) scanF32ziid_counter_mem_4573)[(int64_t) 0] =
                 0;
         }
