@@ -6,7 +6,7 @@ typedef int32_t     ElTp;
 #define lgWARP              5
 #define WARP                (1<<lgWARP)
 
-#define logWORKGROUP_SIZE   10
+#define logWORKGROUP_SIZE   9
 //#define WORKGROUP_SIZE      (1<<logWORKGROUP_SIZE)
 #define WORKGROUP_SIZE      512//1024//128
 

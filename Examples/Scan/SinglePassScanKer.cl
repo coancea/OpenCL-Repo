@@ -300,10 +300,10 @@ incSgmScanGroup0( __local volatile uint8_t* sh_flag
     barrier(CLK_LOCAL_MEM_FENCE);
 }  
 
-
+ 
 inline void
 warpScanSpecial ( __local volatile uint8_t* sh_flag
-                , __local volatile int32_t* sh_data
+                , __local volatile ElTp*    sh_data
                 , const size_t th_id
 ) {
     const size_t lane = th_id & (WARP-1);
@@ -311,10 +311,10 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     for(uint32_t i=0; i<lgWARP; i++) {
         const uint32_t p = (1<<i);
         if( lane >= p ) {
-            uint8_t f1 = sh_flag[th_id-p]; int32_t v1 = sh_data[th_id-p];
-            uint8_t f2 = sh_flag[th_id  ]; int32_t v2 = sh_data[th_id  ];
+            uint8_t f1 = sh_flag[th_id-p]; ElTp v1 = sh_data[th_id-p];
+            uint8_t f2 = sh_flag[th_id  ]; ElTp v2 = sh_data[th_id  ];
 
-            uint8_t f; int32_t v;
+            uint8_t f; ElTp v;
             if(f2 == 2 || f2 == 0) { f = f2; v = v2;}
             else                   { f = f1; v = v1 + v2; }
 
