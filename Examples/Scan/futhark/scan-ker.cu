@@ -3064,7 +3064,7 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     }
 }
 
-#define MM 11
+#define MM 12
 
 __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                     uint local_mem_4602_backing_offset_0,
@@ -3180,7 +3180,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     {
         int32_t gidx_4625 = local_tid_4594 * MM + 1;
         
-        for (int64_t i_4626 = 0; i_4626 < (int64_t) 11; i_4626++) {
+        for (int64_t i_4626 = 0; i_4626 < (int64_t) MM-1; i_4626++) {
             if (!0) {
                 float x_4550;
                 float x_4551;
@@ -3199,7 +3199,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         ((__local float *) local_mem_4602)[squot64(byte_offsets_4598,
                                                    (int64_t) 4) +
                                            sext_i32_i64(local_tid_4594)] =
-            private_mem_4615[(int64_t) 11];
+            private_mem_4615[(int64_t) MM-1];
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
