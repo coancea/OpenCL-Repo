@@ -3064,7 +3064,7 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     }
 }
 
-#define MM 12
+#define MM 11
 
 __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                     uint local_mem_4602_backing_offset_0,
