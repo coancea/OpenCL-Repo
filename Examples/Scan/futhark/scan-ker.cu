@@ -3183,8 +3183,20 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     const uint8_t STATUS_X = 0, STATUS_A = 1, STATUS_P = 2;
     ////////////////////
 
-#if COSMIN
     ElTp  chunk[ELEMS_PER_THREAD];
+    int64_t blockOff_4611 = sext_i32_i64(dynamic_id_4610) * (int64_t) MM *
+            segscan_group_sizze_4556;
+    int64_t sgm_idx_4612 = smod64(blockOff_4611, n_4547);
+    int32_t boundary_4613 = sext_i64_i32(smin64((int64_t) MM *
+                                                segscan_group_sizze_4556,
+                                                n_4547 - sgm_idx_4612));
+    int32_t segsizze_compact_4614 = sext_i64_i32(smin64((int64_t) MM *
+                                                        segscan_group_sizze_4556,
+                                                        n_4547));
+
+
+#if COSMIN
+    
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
         const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
         #pragma unroll
@@ -3223,17 +3235,6 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
 
 #else
-    int64_t blockOff_4611 = sext_i32_i64(dynamic_id_4610) * (int64_t) MM *
-            segscan_group_sizze_4556;
-    int64_t sgm_idx_4612 = smod64(blockOff_4611, n_4547);
-    int32_t boundary_4613 = sext_i64_i32(smin64((int64_t) MM *
-                                                segscan_group_sizze_4556,
-                                                n_4547 - sgm_idx_4612));
-    int32_t segsizze_compact_4614 = sext_i64_i32(smin64((int64_t) MM *
-                                                        segscan_group_sizze_4556,
-                                                        n_4547));
-    int32_t private_mem_4615[(int64_t) MM];
-    
     // Load and map
     {
         for (int64_t i_4617 = 0; i_4617 < (int64_t) MM; i_4617++) {
@@ -3247,9 +3248,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             if (slt64(phys_tid_4618, n_4547)) {
                 int32_t x_4553 = ((__global int32_t *) inp_mem_4563)[gtid_4560];
                 
-                private_mem_4615[i_4617] = x_4553;
+                chunk[i_4617] = x_4553;
             } else {
-                private_mem_4615[i_4617] = 0;
+                chunk[i_4617] = 0;
             }
         }
     }
@@ -3261,13 +3262,13 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                     segscan_group_sizze_4556;
             
             ((__local int32_t *) local_mem_4602)[sharedIdx_4622] =
-                private_mem_4615[i_4621];
+                chunk[i_4621];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int32_t i_4623 = 0; i_4623 < MM; i_4623++) {
             int32_t sharedIdx_4624 = local_tid_4594 * MM + i_4623;
             
-            private_mem_4615[sext_i32_i64(i_4623)] = ((__local
+            chunk[sext_i32_i64(i_4623)] = ((__local
                                                        int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -3280,12 +3281,12 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int32_t x_4550;
             int32_t x_4551;
             
-            x_4550 = private_mem_4615[i_4626];
-            x_4551 = private_mem_4615[i_4626 + (int64_t) 1];
+            x_4550 = chunk[i_4626];
+            x_4551 = chunk[i_4626 + (int64_t) 1];
             
             int32_t defunc_1_op_res_4552 = add32(x_4550, x_4551);
             
-            private_mem_4615[i_4626 + (int64_t) 1] = defunc_1_op_res_4552;
+            chunk[i_4626 + (int64_t) 1] = defunc_1_op_res_4552;
         }
     }
     // Publish results in shared memory
@@ -3293,7 +3294,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         ((__local int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
                                                      (int64_t) 4) +
                                              sext_i32_i64(local_tid_4594)] =
-            private_mem_4615[(int64_t) MM-1];
+            chunk[(int64_t) MM-1];
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
@@ -3501,9 +3502,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
 #endif
-    
+    bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
 
 #if COSMIN
     int32_t prefix = NE;
@@ -3796,7 +3796,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
 #endif
 
-#if COSMIN
+#if 0
     { // finally read and add prefix to every element in this workgroup
       // Coalesced write to global-output 'data' from register 'chunk' by means of shared memory
         ElTp myacc = binOp(prefix, acc_4630);
@@ -3838,11 +3838,11 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         
         for (int64_t i_4667 = 0; i_4667 < (int64_t) MM; i_4667++) {
             if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
-                x_4661 = private_mem_4615[i_4667];
+                x_4661 = chunk[i_4667];
                 
                 int32_t defunc_1_op_res_4662 = add32(x_4660, x_4661);
                 
-                private_mem_4615[i_4667] = defunc_1_op_res_4662;
+                chunk[i_4667] = defunc_1_op_res_4662;
             }
         }
     }
@@ -3853,14 +3853,14 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int64_t sharedIdx_4669 = sext_i32_i64(local_tid_4594 * MM) + i_4668;
             
             ((__local int32_t *) local_mem_4602)[sharedIdx_4669] =
-                private_mem_4615[i_4668];
+                chunk[i_4668];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int64_t i_4670 = 0; i_4670 < (int64_t) MM; i_4670++) {
             int32_t sharedIdx_4671 = local_tid_4594 +
                     sext_i64_i32(segscan_group_sizze_4556 * i_4670);
             
-            private_mem_4615[i_4670] = ((__local
+            chunk[i_4670] = ((__local
                                          int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4671)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -3876,7 +3876,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             
             if (slt64(flat_idx_4673, n_4547)) {
                 ((__global int32_t *) mem_4567)[gtid_4560] =
-                    private_mem_4615[i_4672];
+                    chunk[i_4672];
             }
         }
     }
