@@ -3165,15 +3165,6 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                                    int *) scanF32ziid_counter_mem_4573)[(int64_t) 0],
                                                 (int) 1);
         ((__local int32_t *) local_mem_4602)[(int64_t) 0] = dynamic_id_4610;
-#if COSMIN
-        // If this is the last block, reset the dynamicId
-        {
-            if (dynamic_id_4610 == sdiv_up64(n_4547, trans_arr_len_4603) - (int64_t) 1) {
-                ((__global int32_t *) scanF32ziid_counter_mem_4573)[(int64_t) 0] =
-                    0;
-            }
-        }
-#endif
     }
     barrier(CLK_LOCAL_MEM_FENCE);
     dynamic_id_4610 = ((__local int32_t *) local_mem_4602)[(int64_t) 0];
@@ -3889,6 +3880,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             }
         }
     }
+#endif
     // If this is the last block, reset the dynamicId
     {
         if (dynamic_id_4610 == sdiv_up64(n_4547, segscan_group_sizze_4556 *
@@ -3897,7 +3889,6 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 0;
         }
     }
-#endif
     
   error_0:
     return;
