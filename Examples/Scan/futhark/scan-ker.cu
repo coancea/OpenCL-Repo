@@ -3065,6 +3065,47 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
 }
 
 #define MM 11
+#define ELEMS_PER_THREAD MM
+typedef int32_t ElTp;
+
+inline ElTp binOp(ElTp a, ElTp b) { return a + b; }
+
+inline ElTp
+incScanWarp(__local volatile ElTp* sh_data, const size_t th_id) { 
+    const size_t lane = th_id & (WARP-1);
+    #pragma unroll
+    for(uint32_t i=0; i<lgWARP; i++) {
+        const uint32_t p = (1<<i);
+        if( lane >= p ) sh_data[th_id] = binOp( sh_data[th_id-p], sh_data[th_id] );
+    }
+    return sh_data[th_id];
+}
+
+inline void 
+incScanGroup ( __local volatile ElTp*   sh_data, const size_t tid) {
+    const size_t lane   = tid & (WARP-1);
+    const size_t warpid = tid >> lgWARP;
+
+    // perform scan at warp level
+    ElTp res = incScanWarp(sh_data, tid);
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // if last thread in a warp, record it at the beginning of sh_data
+    if ( lane == (WARP-1) ) { sh_data[ warpid ] = res; }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // first warp scans the per warp results (again)
+    if( warpid == 0 ) incScanWarp(sh_data, tid);
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // accumulate results from previous step;
+    if (warpid > 0) {
+        res = binOp( sh_data[warpid-1], res );
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    sh_data[tid] = res;
+    barrier(CLK_LOCAL_MEM_FENCE);
+}
 
 __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                     uint local_mem_4602_backing_offset_0,
@@ -3125,8 +3166,62 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
     barrier(CLK_LOCAL_MEM_FENCE);
     dynamic_id_4610 = ((__local int32_t *) local_mem_4602)[(int64_t) 0];
-    barrier(CLK_LOCAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE); // this is not needed!!!
     
+    // Cosmin defs
+    #define COSMIN 1
+    const int32_t NE = 0;
+    const int64_t N  = n_4547;
+    int32_t WG_ID  = dynamic_id_4610;
+    int32_t tid = local_tid_4594;
+    volatile __global  int8_t* statusflgs = (volatile __global  int8_t*) status_flags_mem_4575;
+    volatile __global int32_t* incprefix  = (volatile __global int32_t*) incprefixes_mem_4579;
+    volatile __global int32_t* aggregates = (volatile __global int32_t*) aggregates_mem_4577;
+
+    volatile __local int32_t* exchange = ((volatile __local int32_t *) local_mem_4602);
+    const uint8_t STATUS_X = 0, STATUS_A = 1, STATUS_P = 2;
+    ////////////////////
+
+#if COSMIN
+    ElTp  chunk[ELEMS_PER_THREAD];
+    { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
+        const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint32_t gind = block_offset + i*get_local_size(0) + tid;
+            ElTp v = (gind < N) ? ((__global int32_t *) inp_mem_4563)[gind] : NE;
+            exchange[gind - block_offset] = v;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        uint32_t loc_offset = tid * ELEMS_PER_THREAD;
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            chunk[i] = exchange[loc_offset+i];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // Per-Thread scan
+    ElTp acc_4630 = chunk[0];
+    {
+        #pragma unroll
+        for (uint32_t i = 1; i < ELEMS_PER_THREAD; i++) {
+            acc_4630 = binOp(acc_4630, chunk[i]);
+            chunk[i] = acc_4630;
+        }
+        exchange[tid] = acc_4630;
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    { // Per-Group Scan, then store in local memory
+        incScanGroup(exchange, tid);
+        int32_t prev_ind = (tid == 0) ? (get_local_size(0) - 1) : (tid - 1);
+        acc_4630 = exchange[prev_ind];
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+#else
     int64_t blockOff_4611 = sext_i32_i64(dynamic_id_4610) * (int64_t) MM *
             segscan_group_sizze_4556;
     int64_t sgm_idx_4612 = smod64(blockOff_4611, n_4547);
@@ -3406,21 +3501,11 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
+#endif
     
-// Cosmin
-#if 1
-    typedef int32_t ElTp;
-    const int32_t NE = 0;
-    int32_t prefix = NE;
-    int32_t WG_ID  = dynamic_id_4610;
-    int32_t tid = local_tid_4594;
-    volatile __global  int8_t* statusflgs = (volatile __global  int8_t*) status_flags_mem_4575;
-    volatile __global int32_t* incprefix  = (volatile __global int32_t*) incprefixes_mem_4579;
-    volatile __global int32_t* aggregates = (volatile __global int32_t*) aggregates_mem_4577;
 
-    volatile __local int32_t* exchange = ((volatile __local int32_t *) local_mem_4602);
-    const uint8_t STATUS_X = 0, STATUS_A = 1, STATUS_P = 2;
-    
+#if COSMIN
+    int32_t prefix = NE;
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
     {
         if ( (WG_ID == 0) && (tid == 0) ) { // first group, first warp, first lane
@@ -3709,6 +3794,37 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
     }
 #endif
+
+#if COSMIN
+    { // finally read and add prefix to every element in this workgroup
+      // Coalesced write to global-output 'data' from register 'chunk' by means of shared memory
+        ElTp myacc = binOp(prefix, acc_4630);
+        #pragma unroll
+        for (uint32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            exchange[tid*ELEMS_PER_THREAD+i] = binOp(myacc, chunk[i]);
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        const uint32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
+        #pragma unroll
+        for (int32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint32_t gind = block_offset + i * get_local_size(0) + tid;
+            if (gind < N) {
+                ((__global int32_t *) mem_4567)[gind] = exchange[gind - block_offset];
+            }
+        }
+    }
+
+    // If this is the last block, reset the dynamicId
+    {
+        if (dynamic_id_4610 == sdiv_up64(n_4547, segscan_group_sizze_4556 *
+                                         (int64_t) MM) - (int64_t) 1) {
+            ((__global int32_t *) scanF32ziid_counter_mem_4573)[(int64_t) 0] =
+                0;
+        }
+    }
+
+#else
     // Distribute results
     {
         int32_t x_4660;
@@ -3780,6 +3896,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 0;
         }
     }
+#endif
     
   error_0:
     return;
