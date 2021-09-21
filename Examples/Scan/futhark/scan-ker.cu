@@ -3195,7 +3195,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                                         n_4547));
 
 
-#if COSMIN
+#if 0//COSMIN
     
     { // Coalesced read from global-input 'data' into register 'chunk' by means of shared memory
         const int32_t block_offset = WG_ID * get_local_size(0) * ELEMS_PER_THREAD;
@@ -3505,7 +3505,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
 #endif
     bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
 
-#if 0//COSMIN
+#if 1//COSMIN
     int32_t prefix = NE;
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
     {
