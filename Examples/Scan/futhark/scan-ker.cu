@@ -3824,26 +3824,26 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         int32_t x_4663 = prefix_4637;
         int32_t x_4664 = acc_4630;
         
-        //if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
+        if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
             int32_t defunc_1_op_res_4665 = add32(x_4663, x_4664);
             
             x_4660 = defunc_1_op_res_4665;
-        //} else {
-        //    x_4660 = acc_4630;
-        //}
+        } else {
+            x_4660 = acc_4630;
+        }
         
-        //int32_t stopping_point_4666 = segsizze_compact_4614 -
-        //        srem32(local_tid_4594 * MM - 1 + segsizze_compact_4614 -
-        //               boundary_4613, segsizze_compact_4614);
+        int32_t stopping_point_4666 = segsizze_compact_4614 -
+                srem32(local_tid_4594 * MM - 1 + segsizze_compact_4614 -
+                       boundary_4613, segsizze_compact_4614);
         
         for (int64_t i_4667 = 0; i_4667 < (int64_t) MM; i_4667++) {
-        //    if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
+            if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
                 x_4661 = chunk[i_4667];
                 
                 int32_t defunc_1_op_res_4662 = add32(x_4660, x_4661);
                 
                 chunk[i_4667] = defunc_1_op_res_4662;
-        //    }
+            }
         }
     }
     // Transpose scan output
