@@ -1,7 +1,7 @@
 typedef int     int32_t;
 typedef uint    uint32_t;
 typedef uchar   uint8_t;
-
+ 
 #include "GenericHack.h" 
 
 __kernel void memcpy_wflags ( 

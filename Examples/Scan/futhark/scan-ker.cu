@@ -3044,7 +3044,7 @@ __kernel void builtinzhreplicate_i8zireplicate_4585(int32_t num_elems_4582,
 #define lgWARP  5
 inline void
 warpScanSpecial ( __local volatile uint8_t* sh_flag
-                , __local volatile float*   sh_data
+                , __local volatile int32_t* sh_data
                 , const size_t th_id
 ) {
     const size_t lane = th_id & (WARP-1);
@@ -3052,10 +3052,10 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     for(uint32_t i=0; i<lgWARP; i++) {
         const uint32_t p = (1<<i);
         if( lane >= p ) {
-            uint8_t f1 = sh_flag[th_id-p]; float v1 = sh_data[th_id-p];
-            uint8_t f2 = sh_flag[th_id  ]; float v2 = sh_data[th_id  ];
+            uint8_t f1 = sh_flag[th_id-p]; int32_t v1 = sh_data[th_id-p];
+            uint8_t f2 = sh_flag[th_id  ]; int32_t v2 = sh_data[th_id  ];
 
-            uint8_t f; float v;
+            uint8_t f; int32_t v;
             if(f2 == 2 || f2 == 0) { f = f2; v = v2;}
             else                   { f = f1; v = v1 + v2; }
 
@@ -3136,7 +3136,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     int32_t segsizze_compact_4614 = sext_i64_i32(smin64((int64_t) MM *
                                                         segscan_group_sizze_4556,
                                                         n_4547));
-    float private_mem_4615[(int64_t) MM];
+    int32_t private_mem_4615[(int64_t) MM];
     
     // Load and map
     {
@@ -3149,11 +3149,11 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int64_t remnant_4620 = phys_tid_4618 - gtid_4560;
             
             if (slt64(phys_tid_4618, n_4547)) {
-                float x_4553 = ((__global float *) inp_mem_4563)[gtid_4560];
+                int32_t x_4553 = ((__global int32_t *) inp_mem_4563)[gtid_4560];
                 
                 private_mem_4615[i_4617] = x_4553;
             } else {
-                private_mem_4615[i_4617] = 0.0F;
+                private_mem_4615[i_4617] = 0;
             }
         }
     }
@@ -3164,7 +3164,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int64_t sharedIdx_4622 = sext_i32_i64(local_tid_4594) + i_4621 *
                     segscan_group_sizze_4556;
             
-            ((__local float *) local_mem_4602)[sharedIdx_4622] =
+            ((__local int32_t *) local_mem_4602)[sharedIdx_4622] =
                 private_mem_4615[i_4621];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -3172,7 +3172,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int32_t sharedIdx_4624 = local_tid_4594 * MM + i_4623;
             
             private_mem_4615[sext_i32_i64(i_4623)] = ((__local
-                                                       float *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
+                                                       int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
@@ -3181,36 +3181,34 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         int32_t gidx_4625 = local_tid_4594 * MM + 1;
         
         for (int64_t i_4626 = 0; i_4626 < (int64_t) MM-1; i_4626++) {
-            if (!0) {
-                float x_4550;
-                float x_4551;
-                
-                x_4550 = private_mem_4615[i_4626];
-                x_4551 = private_mem_4615[i_4626 + (int64_t) 1];
-                
-                float defunc_1_op_res_4552 = x_4550 + x_4551;
-                
-                private_mem_4615[i_4626 + (int64_t) 1] = defunc_1_op_res_4552;
-            }
+            int32_t x_4550;
+            int32_t x_4551;
+            
+            x_4550 = private_mem_4615[i_4626];
+            x_4551 = private_mem_4615[i_4626 + (int64_t) 1];
+            
+            int32_t defunc_1_op_res_4552 = add32(x_4550, x_4551);
+            
+            private_mem_4615[i_4626 + (int64_t) 1] = defunc_1_op_res_4552;
         }
     }
     // Publish results in shared memory
     {
-        ((__local float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                   (int64_t) 4) +
-                                           sext_i32_i64(local_tid_4594)] =
+        ((__local int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                     (int64_t) 4) +
+                                             sext_i32_i64(local_tid_4594)] =
             private_mem_4615[(int64_t) MM-1];
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
-    float acc_4630;
+    int32_t acc_4630;
     
     // Scan results (with warp scan)
     {
-        float x_4627;
-        float x_4628;
-        float x_4631;
-        float x_4632;
+        int32_t x_4627;
+        int32_t x_4628;
+        int32_t x_4631;
+        int32_t x_4632;
         bool ltid_in_bounds_4634 = slt64(sext_i32_i64(local_tid_4594),
                                          segscan_group_sizze_4556);
         int32_t skip_threads_4635;
@@ -3219,9 +3217,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         {
             if (ltid_in_bounds_4634) {
                 x_4628 = ((volatile __local
-                           float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                            (int64_t) 4) +
-                                                    sext_i32_i64(local_tid_4594)];
+                           int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                              (int64_t) 4) +
+                                                      sext_i32_i64(local_tid_4594)];
                 if ((local_tid_4594 - squot32(local_tid_4594, 32) * 32) == 0) {
                     x_4627 = x_4628;
                 }
@@ -3237,14 +3235,14 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                     // read operands
                     {
                         x_4627 = ((volatile __local
-                                   float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                                    (int64_t) 4) +
-                                                            (sext_i32_i64(local_tid_4594) -
-                                                             sext_i32_i64(skip_threads_4635))];
+                                   int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                                      (int64_t) 4) +
+                                                              (sext_i32_i64(local_tid_4594) -
+                                                               sext_i32_i64(skip_threads_4635))];
                     }
                     // perform operation
                     {
-                        float defunc_1_op_res_4629 = x_4627 + x_4628;
+                        int32_t defunc_1_op_res_4629 = add32(x_4627, x_4628);
                         
                         x_4627 = defunc_1_op_res_4629;
                     }
@@ -3258,9 +3256,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                     // write result
                     {
                         ((volatile __local
-                          float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                           (int64_t) 4) +
-                                                   sext_i32_i64(local_tid_4594)] =
+                          int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                             (int64_t) 4) +
+                                                     sext_i32_i64(local_tid_4594)] =
                             x_4627;
                         x_4628 = x_4627;
                     }
@@ -3277,10 +3275,11 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             if ((local_tid_4594 - squot32(local_tid_4594, 32) * 32) == 31 &&
                 ltid_in_bounds_4634) {
                 ((volatile __local
-                  float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                   (int64_t) 4) +
-                                           sext_i32_i64(squot32(local_tid_4594,
-                                                                32))] = x_4627;
+                  int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                     (int64_t) 4) +
+                                             sext_i32_i64(squot32(local_tid_4594,
+                                                                  32))] =
+                    x_4627;
             }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -3292,9 +3291,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             {
                 if (squot32(local_tid_4594, 32) == 0 && ltid_in_bounds_4634) {
                     x_4632 = ((volatile __local
-                               float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                                (int64_t) 4) +
-                                                        sext_i32_i64(local_tid_4594)];
+                               int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                                  (int64_t) 4) +
+                                                          sext_i32_i64(local_tid_4594)];
                     if ((local_tid_4594 - squot32(local_tid_4594, 32) * 32) ==
                         0) {
                         x_4631 = x_4632;
@@ -3312,14 +3311,15 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                         // read operands
                         {
                             x_4631 = ((volatile __local
-                                       float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                                        (int64_t) 4) +
-                                                                (sext_i32_i64(local_tid_4594) -
-                                                                 sext_i32_i64(skip_threads_4636))];
+                                       int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                                          (int64_t) 4) +
+                                                                  (sext_i32_i64(local_tid_4594) -
+                                                                   sext_i32_i64(skip_threads_4636))];
                         }
                         // perform operation
                         {
-                            float defunc_1_op_res_4633 = x_4631 + x_4632;
+                            int32_t defunc_1_op_res_4633 = add32(x_4631,
+                                                                 x_4632);
                             
                             x_4631 = defunc_1_op_res_4633;
                         }
@@ -3334,9 +3334,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                         // write result
                         {
                             ((volatile __local
-                              float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                               (int64_t) 4) +
-                                                       sext_i32_i64(local_tid_4594)] =
+                              int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                                 (int64_t) 4) +
+                                                         sext_i32_i64(local_tid_4594)] =
                                 x_4631;
                             x_4632 = x_4631;
                         }
@@ -3356,24 +3356,24 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 {
                     x_4628 = x_4627;
                     x_4627 = ((__local
-                               float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                                (int64_t) 4) +
-                                                        (sext_i32_i64(squot32(local_tid_4594,
-                                                                              32)) -
-                                                         (int64_t) 1)];
+                               int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                                  (int64_t) 4) +
+                                                          (sext_i32_i64(squot32(local_tid_4594,
+                                                                                32)) -
+                                                           (int64_t) 1)];
                 }
                 // perform operation
                 {
-                    float defunc_1_op_res_4629 = x_4627 + x_4628;
+                    int32_t defunc_1_op_res_4629 = add32(x_4627, x_4628);
                     
                     x_4627 = defunc_1_op_res_4629;
                 }
                 // write final result
                 {
                     ((__local
-                      float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                       (int64_t) 4) +
-                                               sext_i32_i64(local_tid_4594)] =
+                      int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                         (int64_t) 4) +
+                                                 sext_i32_i64(local_tid_4594)] =
                         x_4627;
                 }
             }
@@ -3382,9 +3382,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         // restore correct values for first block
         {
             if (squot32(local_tid_4594, 32) == 0) {
-                ((__local float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                           (int64_t) 4) +
-                                                   sext_i32_i64(local_tid_4594)] =
+                ((__local int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                             (int64_t) 4) +
+                                                     sext_i32_i64(local_tid_4594)] =
                     x_4628;
             }
         }
@@ -3392,51 +3392,41 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         barrier(CLK_LOCAL_MEM_FENCE);
         if (local_tid_4594 == 0) {
             acc_4630 = ((__local
-                         float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                          (int64_t) 4) +
-                                                  (segscan_group_sizze_4556 -
-                                                   (int64_t) 1)];
+                         int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                            (int64_t) 4) +
+                                                    (segscan_group_sizze_4556 -
+                                                     (int64_t) 1)];
         } else {
             acc_4630 = ((__local
-                         float *) local_mem_4602)[squot64(byte_offsets_4598,
-                                                          (int64_t) 4) +
-                                                  (sext_i32_i64(local_tid_4594) -
-                                                   (int64_t) 1)];
+                         int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
+                                                            (int64_t) 4) +
+                                                    (sext_i32_i64(local_tid_4594) -
+                                                     (int64_t) 1)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
-    float prefix_4637 = 0.0F;
+    int32_t prefix_4637 = 0;
     bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
-    
+#if 1    
     // Perform lookback
     {
         if (block_new_sgm_4638 && local_tid_4594 == 0) {
             ((volatile __global
-              float *) incprefixes_mem_4579)[dynamic_id_4610] = acc_4630;
+              int32_t *) incprefixes_mem_4579)[dynamic_id_4610] = acc_4630;
             mem_fence_global();
             ((volatile __global
               int8_t *) status_flags_mem_4575)[dynamic_id_4610] = (int8_t) 2;
-            acc_4630 = 0.0F;
+            acc_4630 = 0;
         }
         if (!block_new_sgm_4638 && slt32(local_tid_4594, wave_sizze_4596)) {
             if (local_tid_4594 == 0) {
-                if (1) {
-                    ((volatile __global
-                      float *) aggregates_mem_4577)[dynamic_id_4610] = acc_4630;
-                    mem_fence_global();
-                    ((volatile __global
-                      int8_t *) status_flags_mem_4575)[dynamic_id_4610] =
-                        (int8_t) 1;
-                } else {
-                    ((volatile __global
-                      float *) incprefixes_mem_4579)[dynamic_id_4610] =
-                        acc_4630;
-                    mem_fence_global();
-                    ((volatile __global
-                      int8_t *) status_flags_mem_4575)[dynamic_id_4610] =
-                        (int8_t) 2;
-                }
+                ((volatile __global
+                  int32_t *) aggregates_mem_4577)[dynamic_id_4610] = acc_4630;
+                mem_fence_global();
+                ((volatile __global
+                  int8_t *) status_flags_mem_4575)[dynamic_id_4610] =
+                    (int8_t) 1;
                 ((__local int8_t *) local_mem_4602)[(int64_t) 0] = ((__global
                                                                      int8_t *) status_flags_mem_4575)[dynamic_id_4610 -
                                                                                                       (int64_t) 1];
@@ -3449,51 +3439,46 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             if (status_4639 == (int8_t) 2) {
                 if (local_tid_4594 == 0) {
                     prefix_4637 = ((volatile __global
-                                    float *) incprefixes_mem_4579)[dynamic_id_4610 -
-                                                                   (int64_t) 1];
+                                    int32_t *) incprefixes_mem_4579)[dynamic_id_4610 -
+                                                                     (int64_t) 1];
                 }
             } else {
                 int32_t readOffset_4640 = dynamic_id_4610 -
                         sext_i32_i64(wave_sizze_4596);
-                
+#if 1                
                 while (slt32(wave_sizze_4596 * -1, readOffset_4640)) {
                     int32_t read_i_4641 = readOffset_4640 + local_tid_4594;
-                    float aggr_4642 = 0.0F;
+                    int32_t aggr_4642 = 0;
                     int8_t flag_4643 = (int8_t) 0;
                     int8_t used_4644 = (int8_t) 0;
                     
                     if (sle32(0, read_i_4641)) {
-                        if (1) {
-                            flag_4643 = ((volatile __global
-                                          int8_t *) status_flags_mem_4575)[sext_i32_i64(read_i_4641)];
-                            if (flag_4643 == (int8_t) 2) {
-                                aggr_4642 = ((volatile __global
-                                              float *) incprefixes_mem_4579)[sext_i32_i64(read_i_4641)];
-                            } else {
-                                if (flag_4643 == (int8_t) 1) {
-                                    aggr_4642 = ((volatile __global
-                                                  float *) aggregates_mem_4577)[sext_i32_i64(read_i_4641)];
-                                    used_4644 = (int8_t) 1;
-                                }
-                            }
+                        flag_4643 = ((volatile __global
+                                      int8_t *) status_flags_mem_4575)[sext_i32_i64(read_i_4641)];
+                        if (flag_4643 == (int8_t) 2) {
+                            aggr_4642 = ((volatile __global
+                                          int32_t *) incprefixes_mem_4579)[sext_i32_i64(read_i_4641)];
                         } else {
-                            flag_4643 = (int8_t) 2;
+                            if (flag_4643 == (int8_t) 1) {
+                                aggr_4642 = ((volatile __global
+                                              int32_t *) aggregates_mem_4577)[sext_i32_i64(read_i_4641)];
+                                used_4644 = (int8_t) 1;
+                            }
                         }
                     }
-# if 1
-                    ((__local float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                       (int64_t) 4) + sext_i32_i64(local_tid_4594)] =
-                        aggr_4642;
-                                        
-                    ((__local uint8_t *) local_mem_4602)[sext_i32_i64(local_tid_4594)] =
-                        flag_4643;
-                    warpScanSpecial ( (volatile __local uint8_t*) local_mem_4602
-                                    , (volatile __local float  *) ( local_mem_4602  + warp_byte_offset_4600 ) 
-                                    , local_tid_4594
-                                    );
-                    uint8_t flag = ((__local uint8_t *) local_mem_4602)[sext_i32_i64(WARP-1)];
-                    float   aggr = ((__local float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                       (int64_t) 4) + sext_i32_i64(WARP-1)];
+#if 1
+		    __local volatile int32_t* exchange =
+		    	    (__local volatile int32_t*) local_mem_4602;
+		    __local volatile uint8_t* warpscan =
+		    	    (__local volatile uint8_t*) (local_mem_4602 + warp_byte_offset_4600*4);
+
+		    exchange[local_tid_4594] = aggr_4642;
+		    warpscan[local_tid_4594] = flag_4643;
+		    
+		    if( warpscan[WARP-1] != (uint8_t)2 )
+                        warpScanSpecial ( warpscan, exchange, local_tid_4594 );
+                    uint8_t flag = warpscan[WARP-1];
+                    int32_t aggr = exchange[WARP-1];
 
                     // now we have performed the scan; advance only if flag is not 0
                     if (flag == (uint8_t) 2) {
@@ -3508,9 +3493,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                     mem_fence_local();
 #else
                     ((__local
-                      float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                       (int64_t) 4) +
-                                               sext_i32_i64(local_tid_4594)] =
+                      int32_t *) local_mem_4602)[squot64(warp_byte_offset_4600,
+                                                         (int64_t) 4) +
+                                                 sext_i32_i64(local_tid_4594)] =
                         aggr_4642;
                     
                     int8_t tmp_4645 = flag_4643 | shl8(used_4644, (int8_t) 2);
@@ -3524,8 +3509,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                                             (int64_t) 1];
                     if (local_tid_4594 == 0) {
                         if (!(flag_4643 == (int8_t) 2)) {
-                            float x_4646 = 0.0F;
-                            float x_4647;
+                            int32_t x_4646 = 0;
+                            int32_t x_4647;
                             int8_t flag1_4649 = (int8_t) 0;
                             int8_t flag2_4650;
                             int8_t used1_4651 = (int8_t) 0;
@@ -3538,9 +3523,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                 used2_4652 = lshr8(flag2_4650, (int8_t) 2);
                                 flag2_4650 = flag2_4650 & (int8_t) 3;
                                 x_4647 = ((__local
-                                           float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                                            (int64_t) 4) +
-                                                                    sext_i32_i64(i_4653)];
+                                           int32_t *) local_mem_4602)[squot64(warp_byte_offset_4600,
+                                                                              (int64_t) 4) +
+                                                                      sext_i32_i64(i_4653)];
                                 if (!(flag2_4650 == (int8_t) 1)) {
                                     flag1_4649 = flag2_4650;
                                     used1_4651 = used2_4652;
@@ -3548,8 +3533,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                 } else {
                                     used1_4651 += used2_4652;
                                     
-                                    float defunc_1_op_res_4648 = x_4646 +
-                                          x_4647;
+                                    int32_t defunc_1_op_res_4648 = add32(x_4646,
+                                                                         x_4647);
                                     
                                     x_4646 = defunc_1_op_res_4648;
                                 }
@@ -3559,10 +3544,10 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                             aggr_4642 = x_4646;
                         } else {
                             aggr_4642 = ((__local
-                                          float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                                           (int64_t) 4) +
-                                                                   (sext_i32_i64(wave_sizze_4596) -
-                                                                    (int64_t) 1)];
+                                          int32_t *) local_mem_4602)[squot64(warp_byte_offset_4600,
+                                                                             (int64_t) 4) +
+                                                                     (sext_i32_i64(wave_sizze_4596) -
+                                                                      (int64_t) 1)];
                         }
                         if (flag_4643 == (int8_t) 2) {
                             readOffset_4640 = wave_sizze_4596 * -1;
@@ -3572,9 +3557,9 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                         ((__local int32_t *) local_mem_4602)[(int64_t) 0] =
                             readOffset_4640;
                         
-                        float x_4654 = aggr_4642;
-                        float x_4655 = prefix_4637;
-                        float defunc_1_op_res_4656 = x_4654 + x_4655;
+                        int32_t x_4654 = aggr_4642;
+                        int32_t x_4655 = prefix_4637;
+                        int32_t defunc_1_op_res_4656 = add32(x_4654, x_4655);
                         
                         prefix_4637 = defunc_1_op_res_4656;
                     }
@@ -3583,16 +3568,18 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                         int32_t *) local_mem_4602)[(int64_t) 0];
 #endif
                 }
+#endif
             }
+
             if (local_tid_4594 == 0) {
                 if (boundary_4613 == sext_i64_i32(segscan_group_sizze_4556 *
                     (int64_t) MM)) {
-                    float x_4657 = prefix_4637;
-                    float x_4658 = acc_4630;
-                    float defunc_1_op_res_4659 = x_4657 + x_4658;
+                    int32_t x_4657 = prefix_4637;
+                    int32_t x_4658 = acc_4630;
+                    int32_t defunc_1_op_res_4659 = add32(x_4657, x_4658);
                     
                     ((volatile __global
-                      float *) incprefixes_mem_4579)[dynamic_id_4610] =
+                      int32_t *) incprefixes_mem_4579)[dynamic_id_4610] =
                         defunc_1_op_res_4659;
                     mem_fence_global();
                     ((volatile __global
@@ -3600,28 +3587,30 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                         (int8_t) 2;
                 }
                 ((__local
-                  float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                   (int64_t) 4)] = prefix_4637;
-                acc_4630 = 0.0F;
+                  int32_t *) local_mem_4602)[squot64(warp_byte_offset_4600,
+                                                     (int64_t) 4)] =
+                    prefix_4637;
+                acc_4630 = 0;
             }
         }
         if (!(dynamic_id_4610 == (int64_t) 0)) {
             barrier(CLK_LOCAL_MEM_FENCE);
             prefix_4637 = ((__local
-                            float *) local_mem_4602)[squot64(warp_byte_offset_4600,
-                                                             (int64_t) 4)];
+                            int32_t *) local_mem_4602)[squot64(warp_byte_offset_4600,
+                                                               (int64_t) 4)];
             barrier(CLK_LOCAL_MEM_FENCE);
         }
     }
+#endif
     // Distribute results
     {
-        float x_4660;
-        float x_4661;
-        float x_4663 = prefix_4637;
-        float x_4664 = acc_4630;
+        int32_t x_4660;
+        int32_t x_4661;
+        int32_t x_4663 = prefix_4637;
+        int32_t x_4664 = acc_4630;
         
         if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
-            float defunc_1_op_res_4665 = x_4663 + x_4664;
+            int32_t defunc_1_op_res_4665 = add32(x_4663, x_4664);
             
             x_4660 = defunc_1_op_res_4665;
         } else {
@@ -3636,7 +3625,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
                 x_4661 = private_mem_4615[i_4667];
                 
-                float defunc_1_op_res_4662 = x_4660 + x_4661;
+                int32_t defunc_1_op_res_4662 = add32(x_4660, x_4661);
                 
                 private_mem_4615[i_4667] = defunc_1_op_res_4662;
             }
@@ -3648,7 +3637,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         for (int64_t i_4668 = 0; i_4668 < (int64_t) MM; i_4668++) {
             int64_t sharedIdx_4669 = sext_i32_i64(local_tid_4594 * MM) + i_4668;
             
-            ((__local float *) local_mem_4602)[sharedIdx_4669] =
+            ((__local int32_t *) local_mem_4602)[sharedIdx_4669] =
                 private_mem_4615[i_4668];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -3657,7 +3646,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                     sext_i64_i32(segscan_group_sizze_4556 * i_4670);
             
             private_mem_4615[i_4670] = ((__local
-                                         float *) local_mem_4602)[sext_i32_i64(sharedIdx_4671)];
+                                         int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4671)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
@@ -3671,7 +3660,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             int64_t remnant_4675 = flat_idx_4673 - gtid_4560;
             
             if (slt64(flat_idx_4673, n_4547)) {
-                ((__global float *) mem_4567)[gtid_4560] =
+                ((__global int32_t *) mem_4567)[gtid_4560] =
                     private_mem_4615[i_4672];
             }
         }
