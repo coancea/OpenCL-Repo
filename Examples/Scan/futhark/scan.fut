@@ -1,7 +1,6 @@
 -- ==
 -- entry: scanF32
 -- random input {  [16777216]i32 } auto output
-
 -- random input {  [100000000]i32 }
 
 entry scanF32 [n] (inp: [n]i32) =

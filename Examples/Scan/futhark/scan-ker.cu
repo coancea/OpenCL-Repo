@@ -3867,8 +3867,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
 #if 1
         const uint64_t block_offset = ((uint64_t)WG_ID) * (get_local_size(0) * ELEMS_PER_THREAD);
         #pragma unroll
-        for (int32_t i = 0; i < ELEMS_PER_THREAD; i++) {
-            uint32_t gind = block_offset + i * get_local_size(0) + tid;
+        for (int64_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint64_t gind = block_offset + i * get_local_size(0) + tid;
             if (gind < N) {
                 ((__global int32_t *) mem_4567)[gind] = exchange[gind - block_offset];
             }
