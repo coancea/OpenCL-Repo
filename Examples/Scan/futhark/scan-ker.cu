@@ -3168,7 +3168,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
     barrier(CLK_LOCAL_MEM_FENCE);
     dynamic_id_4610 = ((__local int32_t *) local_mem_4602)[(int64_t) 0];
-    barrier(CLK_LOCAL_MEM_FENCE); // this is not needed!!!
+    barrier(CLK_LOCAL_MEM_FENCE); 
     
     // Cosmin defs
     const int32_t NE = 0;
@@ -3256,7 +3256,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     }
     // Transpose scan inputs
     {
-        barrier(CLK_LOCAL_MEM_FENCE);
+        //barrier(CLK_LOCAL_MEM_FENCE); // COSMIN this is not needed!
         for (int64_t i_4621 = 0; i_4621 < (int64_t) MM; i_4621++) {
             int64_t sharedIdx_4622 = sext_i32_i64(local_tid_4594) + i_4621 *
                     segscan_group_sizze_4556;
@@ -3265,15 +3265,19 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 chunk[i_4621];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
+        int32_t tmpacc = 0;
         for (int32_t i_4623 = 0; i_4623 < MM; i_4623++) {
             int32_t sharedIdx_4624 = local_tid_4594 * MM + i_4623;
             
-            chunk[sext_i32_i64(i_4623)] = ((__local
-                                                       int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
+            int32_t val = ((__local int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4624)];
+            tmpacc = tmpacc + val;
+            chunk[sext_i32_i64(i_4623)] = tmpacc;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    // Per thread scan
+    // Per thread scan  
+    //COSMIN: should be done directly when reading from shared mem
+#if 0
     {
         int32_t gidx_4625 = local_tid_4594 * MM + 1;
         
@@ -3289,6 +3293,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             chunk[i_4626 + (int64_t) 1] = defunc_1_op_res_4552;
         }
     }
+#endif
     // Publish results in shared memory
     {
         ((__local int32_t *) local_mem_4602)[squot64(byte_offsets_4598,
