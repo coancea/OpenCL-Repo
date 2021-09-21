@@ -3824,31 +3824,31 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         int32_t x_4663 = prefix_4637;
         int32_t x_4664 = acc_4630;
         
-        if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
+        //if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
             int32_t defunc_1_op_res_4665 = add32(x_4663, x_4664);
             
             x_4660 = defunc_1_op_res_4665;
-        } else {
-            x_4660 = acc_4630;
-        }
+        //} else {
+        //    x_4660 = acc_4630;
+        //}
         
-        int32_t stopping_point_4666 = segsizze_compact_4614 -
-                srem32(local_tid_4594 * MM - 1 + segsizze_compact_4614 -
-                       boundary_4613, segsizze_compact_4614);
+        //int32_t stopping_point_4666 = segsizze_compact_4614 -
+        //        srem32(local_tid_4594 * MM - 1 + segsizze_compact_4614 -
+        //               boundary_4613, segsizze_compact_4614);
         
         for (int64_t i_4667 = 0; i_4667 < (int64_t) MM; i_4667++) {
-            if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
+        //    if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
                 x_4661 = chunk[i_4667];
                 
                 int32_t defunc_1_op_res_4662 = add32(x_4660, x_4661);
                 
                 chunk[i_4667] = defunc_1_op_res_4662;
-            }
+        //    }
         }
     }
     // Transpose scan output
     {
-        barrier(CLK_LOCAL_MEM_FENCE);
+        //barrier(CLK_LOCAL_MEM_FENCE);
         for (int64_t i_4668 = 0; i_4668 < (int64_t) MM; i_4668++) {
             int64_t sharedIdx_4669 = sext_i32_i64(local_tid_4594 * MM) + i_4668;
             
@@ -3856,6 +3856,17 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                 chunk[i_4668];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
+#if 1
+        const uint64_t block_offset = ((uint64_t)WG_ID) * (get_local_size(0) * ELEMS_PER_THREAD);
+        #pragma unroll
+        for (int32_t i = 0; i < ELEMS_PER_THREAD; i++) {
+            uint32_t gind = block_offset + i * get_local_size(0) + tid;
+            if (gind < N) {
+                ((__global int32_t *) mem_4567)[gind] = exchange[gind - block_offset];
+            }
+        }
+    }
+#else
         for (int64_t i_4670 = 0; i_4670 < (int64_t) MM; i_4670++) {
             int32_t sharedIdx_4671 = local_tid_4594 +
                     sext_i64_i32(segscan_group_sizze_4556 * i_4670);
@@ -3864,6 +3875,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                          int32_t *) local_mem_4602)[sext_i32_i64(sharedIdx_4671)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
+
     }
     // Write block scan results to global memory
     {
@@ -3880,6 +3892,8 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             }
         }
     }
+#endif
+
 #endif
     // If this is the last block, reset the dynamicId
     {
