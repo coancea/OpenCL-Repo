@@ -3064,7 +3064,7 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     }
 }
 
-#define MM 11
+#define MM 23
 #define ELEMS_PER_THREAD MM
 typedef int32_t ElTp;
 
@@ -3237,7 +3237,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
 #else
     // Load and map
     {   
-        #pragma unroll
+        //#pragma unroll
         for (int64_t i_4617 = 0; i_4617 < (int64_t) MM; i_4617++) {
             int64_t phys_tid_4618 = blockOff_4611 +
                     sext_i32_i64(local_tid_4594) + i_4617 *
@@ -3258,7 +3258,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
     // Transpose scan inputs
     {
         //barrier(CLK_LOCAL_MEM_FENCE); // COSMIN this is not needed!
-        #pragma unroll
+        //#pragma unroll
         for (int64_t i_4621 = 0; i_4621 < (int64_t) MM; i_4621++) {
             int64_t sharedIdx_4622 = sext_i32_i64(local_tid_4594) + i_4621 *
                     segscan_group_sizze_4556;
@@ -3268,7 +3268,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         int32_t tmpacc = 0;
-        #pragma unroll
+        //#pragma unroll
         for (int32_t i_4623 = 0; i_4623 < MM; i_4623++) {
             int32_t sharedIdx_4624 = local_tid_4594 * MM + i_4623;
             
