@@ -3405,10 +3405,117 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }
-    
-    int32_t prefix_4637 = 0;
     bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
-#if 1    
+    
+// Cosmin
+#if 1
+    typedef int32_t ElTp;
+    const int32_t NE = 0;
+    int32_t prefix = NE;
+    int32_t WG_ID  = dynamic_id_4610;
+    int32_t tid = local_tid_4594;
+    volatile __global  int8_t* statusflgs = (volatile __global  int8_t*) status_flags_mem_4575;
+    volatile __global int32_t* incprefix  = (volatile __global int32_t*) incprefixes_mem_4579;
+    volatile __global int32_t* aggregates = (volatile __global int32_t*) aggregates_mem_4577;
+
+    volatile __local int32_t* exchange = ((volatile __local int32_t *) local_mem_4602);
+    const uint8_t STATUS_X = 0, STATUS_A = 1, STATUS_P = 2;
+    
+    // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
+    {
+        if ( (WG_ID == 0) && (tid == 0) ) { // first group, first warp, first lane
+            incprefix[WG_ID] = acc_4630;
+            mem_fence_global(); //mem_fence(CLK_GLOBAL_MEM_FENCE);
+            statusflgs[WG_ID] = STATUS_P;
+            acc_4630 = NE;
+        }
+        if ( (WG_ID != 0) && (tid < WARP) ) { // WG_ID != 0, first warp, all lanes
+            volatile __local uint8_t * warpscan = (volatile __local uint8_t*)(exchange+get_local_size(0));
+            
+            if ( tid == 0 ) { // first lane
+                // publish the partial result a.s.a.p.
+                aggregates[WG_ID] = acc_4630;
+                mem_fence_global(); //mem_fence(CLK_GLOBAL_MEM_FENCE);
+                statusflgs[WG_ID] = STATUS_A;
+                warpscan[0] = statusflgs[WG_ID-1];
+            }
+            mem_fence_local(); //mem_fence(CLK_LOCAL_MEM_FENCE); 
+            uint8_t stat1 = warpscan[0];
+	        if (stat1 == STATUS_P) {
+                // important performance optimization:
+                // do not enter the expensive communication if
+                // the previous workgroup has published its prefix!
+                if(tid == 0) {
+                    prefix = incprefix[WG_ID-1];
+                }
+            } else {
+                int32_t read_offset = WG_ID - WARP;
+                int32_t LOOP_STOP = -WARP;
+
+	            // look at WARP previous blocks at a time until
+                // the whole prefix of this workgroup is computed
+                while (read_offset > LOOP_STOP) {
+                    int32_t read_i = read_offset + tid;
+
+                    // Read WARP flag/aggregate values in local memory
+                    ElTp    aggr = NE;
+                    uint8_t flag = STATUS_X;
+                    if (read_i >= 0) {
+                        flag = statusflgs[read_i];
+                        if (flag == STATUS_P) {
+                            aggr = incprefix[read_i];
+                        } else if (flag == STATUS_A) {
+                            aggr = aggregates[read_i];
+                        }
+                    }
+#if 1
+                    exchange[tid]       = aggr;
+                    warpscan[tid]       = flag;
+
+                    if(warpscan[WARP-1] != STATUS_P)
+                        warpScanSpecial ( warpscan, exchange, tid);
+                    flag = warpscan[WARP-1];
+                    aggr = exchange[WARP-1];
+
+                    // now we have performed the scan; advance only if flag is not 0
+                    if (flag == STATUS_P) {
+                        read_offset = LOOP_STOP;
+                    } else if (flag == STATUS_A) {
+                        read_offset = read_offset - WARP;
+                    }
+                    if (flag != STATUS_X) {
+                        prefix = aggr + prefix;
+                    }
+
+                    mem_fence_local(); //mem_fence(CLK_LOCAL_MEM_FENCE);
+
+                } // END WHILE loop
+#endif
+            } // END ELSE branch of if (stat1 == STATUS_P)
+
+            if(tid == 0) {
+                // publish the prefix of the current workgroup
+                incprefix[WG_ID] = prefix + acc_4630;
+                mem_fence_global(); //mem_fence(CLK_GLOBAL_MEM_FENCE);
+                statusflgs[WG_ID] = STATUS_P;
+                // publish prefix for all work items and update acc
+                exchange[0] = prefix;
+                acc_4630 = 0;
+            }
+        } // end IF(WG_ID != 0) && (tid < WARP)
+
+        if (WG_ID != 0)  {
+            // all workgroup threads read the prefix
+            barrier(CLK_LOCAL_MEM_FENCE);
+            prefix = exchange[0];
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+    }
+    int32_t prefix_4637 = prefix;
+    // END COSMIN
+#else
+    int32_t prefix_4637 = 0;
+
     // Perform lookback
     {
         if (block_new_sgm_4638 && local_tid_4594 == 0) {
