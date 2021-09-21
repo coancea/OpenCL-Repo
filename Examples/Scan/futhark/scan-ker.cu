@@ -3107,6 +3107,8 @@ incScanGroup ( __local volatile ElTp*   sh_data, const size_t tid) {
     barrier(CLK_LOCAL_MEM_FENCE);
 }
 
+#define COSMIN 1
+
 __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                     uint local_mem_4602_backing_offset_0,
                                     int64_t n_4547, __global
@@ -3163,13 +3165,21 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                                                    int *) scanF32ziid_counter_mem_4573)[(int64_t) 0],
                                                 (int) 1);
         ((__local int32_t *) local_mem_4602)[(int64_t) 0] = dynamic_id_4610;
+#if COSMIN
+        // If this is the last block, reset the dynamicId
+        {
+            if (dynamic_id_4610 == sdiv_up64(n_4547, trans_arr_len_4603) - (int64_t) 1) {
+                ((__global int32_t *) scanF32ziid_counter_mem_4573)[(int64_t) 0] =
+                    0;
+            }
+        }
+#endif
     }
     barrier(CLK_LOCAL_MEM_FENCE);
     dynamic_id_4610 = ((__local int32_t *) local_mem_4602)[(int64_t) 0];
     barrier(CLK_LOCAL_MEM_FENCE); // this is not needed!!!
     
     // Cosmin defs
-    #define COSMIN 1
     const int32_t NE = 0;
     const int64_t N  = n_4547;
     int32_t WG_ID  = dynamic_id_4610;
@@ -3812,15 +3822,6 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
             if (gind < N) {
                 ((__global int32_t *) mem_4567)[gind] = exchange[gind - block_offset];
             }
-        }
-    }
-
-    // If this is the last block, reset the dynamicId
-    {
-        if (dynamic_id_4610 == sdiv_up64(n_4547, segscan_group_sizze_4556 *
-                                         (int64_t) MM) - (int64_t) 1) {
-            ((__global int32_t *) scanF32ziid_counter_mem_4573)[(int64_t) 0] =
-                0;
         }
     }
 
