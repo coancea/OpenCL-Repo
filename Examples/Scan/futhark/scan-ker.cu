@@ -3505,7 +3505,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
 #endif
     bool block_new_sgm_4638 = sgm_idx_4612 == (int64_t) 0;
 
-#if COSMIN
+#if 0//COSMIN
     int32_t prefix = NE;
     // Compute prefix from previous blocks (ASSUMES GROUP SIZE MULTIPLE OF 32!)
     {
@@ -3824,7 +3824,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         int32_t x_4663 = prefix_4637;
         int32_t x_4664 = acc_4630;
         
-        if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) {
+        if (slt32(local_tid_4594 * MM, boundary_4613) && !block_new_sgm_4638) { // COSMIN: if not needed, perhaps for segscan
             int32_t defunc_1_op_res_4665 = add32(x_4663, x_4664);
             
             x_4660 = defunc_1_op_res_4665;
@@ -3837,7 +3837,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
                        boundary_4613, segsizze_compact_4614);
         
         for (int64_t i_4667 = 0; i_4667 < (int64_t) MM; i_4667++) {
-            if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) {
+            if (slt32(sext_i64_i32(i_4667), stopping_point_4666 - 1)) { // COSMIN: if not needed, perhaps for segscan?
                 x_4661 = chunk[i_4667];
                 
                 int32_t defunc_1_op_res_4662 = add32(x_4660, x_4661);
@@ -3867,6 +3867,7 @@ __kernel void scanF32zisegscan_4561(__global int *global_failure,
         }
     }
 #else
+        // CRAZY ... why move to registers again?
         for (int64_t i_4670 = 0; i_4670 < (int64_t) MM; i_4670++) {
             int32_t sharedIdx_4671 = local_tid_4594 +
                     sext_i64_i32(segscan_group_sizze_4556 * i_4670);
