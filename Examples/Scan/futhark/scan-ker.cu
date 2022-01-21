@@ -3064,7 +3064,7 @@ warpScanSpecial ( __local volatile uint8_t* sh_flag
     }
 }
 
-#define MM 11
+#define MM 23
 #define ELEMS_PER_THREAD MM
 typedef int32_t ElTp;
 
