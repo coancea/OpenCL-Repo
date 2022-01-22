@@ -3497,7 +3497,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
     int64_t ltid_x_5585 = sext_i32_i64(sext_i64_i32(ltid_pre_6374));
     int32_t ltid_flat_5587 = local_tid_6369;
     float color_6332[Ry_5547 * Rx_5549];
-    
+
     for (int64_t i_5590 = 0; i_5590 < Ry_5547; i_5590++) {
         for (int64_t i_5593 = 0; i_5593 < Rx_5549; i_5593++) {
             color_6332[i_5590 * Rx_5549 + i_5593] = 0.0F;
@@ -4015,6 +4015,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
     for (int32_t i_21 = 0; i_21 < Ry_5547 * Rx_5549; i_21++)
         ext_mem_unused_6328[i_21] = mem_param_out_6329[i_21];
     
+#if 0
     int64_t slice_6456 = Tx_5548;
     int64_t slice_6457 = Ty_5546 * slice_6456;
     int64_t reg_tile_i_6454 = squot64(sext_i32_i64(local_tid_6369), slice_6456);
@@ -4041,6 +4042,21 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
             }
         }
     }
+#else
+    unsigned int indy = iii_5572 + ltid_y_5586 * Ry_5547;
+    unsigned int indx = jjj_5573 + ltid_x_5585 * Rx_5549;
+    // heightA -> n_5370
+    // widthA  -> m_5371
+    // widthB  -> p_5372
+    #pragma unroll
+    for(int i=0; i<Ry_5547; i++) {
+        #pragma unroll
+        for(int j=0; j<Rx_5549; j++) {
+            if( (indy+i < n_5370) && (indx+j < p_5372) )
+                ((__global float *) mem_6277)[(indy+i)*p_5372 + (indx+j)] = ext_mem_6273[i*Rx_5549 + j];
+        }
+    }
+#endif
     
   error_9:
     return;
