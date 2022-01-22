@@ -5,7 +5,8 @@
 typedef char int8_t;
 typedef short int16_t;
 typedef int int32_t;
-typedef long long int64_t;
+typedef int int64_t;
+typedef long long int64_t_true;
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
@@ -3408,12 +3409,12 @@ __kernel void mainzisegmap_5415(__global int *global_failure, int64_t n_5370,
 __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                                            uint color_6344_backing_offset_0,
                                            uint color_6343_backing_offset_1,
-                                           int64_t n_5370, int64_t m_5371,
-                                           int64_t p_5372,
-                                           int64_t gridDim_x_5565,
-                                           int64_t gridDim_y_5566,
-                                           int64_t full_tiles_5599,
-                                           int64_t kk_5822, __global
+                                           int64_t_true n_5370, int64_t_true m_5371,
+                                           int64_t_true p_5372,
+                                           int64_t_true gridDim_x_5565,
+                                           int64_t_true gridDim_y_5566,
+                                           int64_t_true full_tiles_5599,
+                                           int64_t_true kk_5822, __global
                                            unsigned char *xss_mem_6059, __global
                                            unsigned char *yss_mem_6060, __global
                                            unsigned char *mem_6277)
