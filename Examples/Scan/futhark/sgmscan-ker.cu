@@ -3042,7 +3042,7 @@ __kernel void builtinzhreplicate_i8zireplicate_4703(int32_t num_elems_4700,
 
 #define WARP   32
 #define lgWARP  5
-#define MM 11
+#define MM 23
 #define ELEMS_PER_THREAD MM
 typedef int32_t ElTp;
 
@@ -3725,6 +3725,7 @@ __kernel void mainzisegscan_4662(__global int *global_failure,
                 private_mem_4733[i_4792];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
+	// COSMIN
 #if 1
         __local int32_t * exchange = (__local int32_t *) local_mem_4720;
         const int32_t tid = local_tid_4712;
