@@ -3698,8 +3698,8 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                     int64_t cmpop_x_5800 = binop_x_5798 + binop_y_5799;
                     bool binop_y_5801 = slt64(cmpop_x_5800, p_5372);
                     bool cond_5802 = binop_x_5797 && binop_y_5801;
-                    
-                    if (cond_5802) {
+                    // COSMIN
+                    //if (cond_5802) {
                         float a_5804;
                         
                         a_5804 = color_6342[i_5789];
@@ -3718,7 +3718,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                         
                         mem_param_6160[i_5789 * Rx_5549 + i_5792] =
                             defunc_1_op_res_5813;
-                    }
+                    //}
                 }
             }
             for (int64_t i_6420 = 0; i_6420 < Ry_5547; i_6420++) {
