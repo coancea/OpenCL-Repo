@@ -3511,7 +3511,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
             color_6345[i_6391 * Rx_5549 + i_6392] = tmp_6393;
         }
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+//    barrier(CLK_LOCAL_MEM_FENCE);
     
     float ext_mem_6192[Ry_5547 * Rx_5549];
     float mem_param_6103[Ry_5547 * Rx_5549];
@@ -3564,7 +3564,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                     ((__local float *) color_6344)[x_loc_ind_5642] =
                         x_elem_5637;
                 }
-                barrier(CLK_LOCAL_MEM_FENCE);
+//                barrier(CLK_LOCAL_MEM_FENCE);
             }
         }
         for (int64_t i_5650 = 0; i_5650 < tk_div_tx_5551; i_5650++) {
@@ -3610,7 +3610,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                     ((__local float *) color_6343)[x_loc_ind_5687] =
                         x_elem_5682;
                 }
-                barrier(CLK_LOCAL_MEM_FENCE);
+//                barrier(CLK_LOCAL_MEM_FENCE);
             }
         }
         for (int64_t i_6402 = 0; i_6402 < Ry_5547; i_6402++) {
@@ -3621,6 +3621,8 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                 color_6339[i_6402 * Rx_5549 + i_6403] = tmp_6404;
             }
         }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
         
         float ext_mem_6189[Ry_5547 * Rx_5549];
         float ext_mem_unused_6320[Ry_5547 * Rx_5549];
@@ -3680,7 +3682,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                 tmp_6417 = color_6333[i_6416];
                 color_6341[i_6416] = tmp_6417;
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
             
             int64_t ltid_y_5783 = sext_i32_i64(sext_i64_i32(ltid_pre_6373));
             int64_t ltid_x_5782 = sext_i32_i64(sext_i64_i32(ltid_pre_6374));
@@ -3729,7 +3731,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                     mem_param_out_6321[i_6420 * Rx_5549 + i_6421] = tmp_6422;
                 }
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
             
             float mem_param_tmp_6405[Ry_5547 * Rx_5549];
             
@@ -3756,6 +3758,8 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
             mem_param_tmp_6394[i_11] = ext_mem_6189[i_11];
         for (int32_t i_12 = 0; i_12 < Ry_5547 * Rx_5549; i_12++)
             mem_param_6103[i_12] = mem_param_tmp_6394[i_12];
+
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
     for (int32_t i_13 = 0; i_13 < Ry_5547 * Rx_5549; i_13++)
         ext_mem_6192[i_13] = mem_param_6103[i_13];
@@ -3803,7 +3807,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                                                             a_loc_szz_5559)) {
                 ((__local float *) color_6344)[x_loc_ind_5864] = x_elem_5859;
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
         }
     }
     for (int64_t i_5872 = 0; i_5872 < tk_div_tx_5551; i_5872++) {
@@ -3850,9 +3854,10 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                                                             b_loc_szz_5564)) {
                 ((__local float *) color_6343)[x_loc_ind_5913] = x_elem_5908;
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
         }
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
     for (int64_t i_6427 = 0; i_6427 < Ry_5547; i_6427++) {
         for (int64_t i_6428 = 0; i_6428 < Rx_5549; i_6428++) {
             float tmp_6429;
@@ -3927,7 +3932,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                 tmp_6442 = color_6335[i_6441];
                 color_6341[i_6441] = tmp_6442;
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
             
             int64_t ltid_y_6011 = sext_i32_i64(sext_i64_i32(ltid_pre_6373));
             int64_t ltid_x_6010 = sext_i32_i64(sext_i64_i32(ltid_pre_6374));
@@ -3976,7 +3981,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
                     color_6340[i_6445 * Rx_5549 + i_6446] = tmp_6447;
                 }
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+//            barrier(CLK_LOCAL_MEM_FENCE);
             for (int64_t i_6448 = 0; i_6448 < Ry_5547; i_6448++) {
                 for (int64_t i_6449 = 0; i_6449 < Rx_5549; i_6449++) {
                     float tmp_6450;
