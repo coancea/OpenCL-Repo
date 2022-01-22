@@ -1,32 +1,9 @@
 -- ==
--- compiled input @ matmul-data/m1024x1024x1024
+-- random input { [1024][1024]f32 [1024][1024]f32 } auto output
+
+-- random input { [2048][4096]f32 [4096][2048]f32 } auto output
 
 -- compiled input @ matmul-data/m10x500x64
-
--- notune compiled input @ matmul-data/2pow25_work_2pow0_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow1_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow2_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow3_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow4_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow5_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow6_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow7_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow8_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow9_outer
--- notune compiled input @ matmul-data/2pow25_work_2pow10_outer
---
--- compiled input @ matmul-data/2pow20_work_2pow0_outer
--- compiled input @ matmul-data/2pow20_work_2pow1_outer
--- compiled input @ matmul-data/2pow20_work_2pow2_outer
--- compiled input @ matmul-data/2pow20_work_2pow3_outer
--- compiled input @ matmul-data/2pow20_work_2pow4_outer
--- compiled input @ matmul-data/2pow20_work_2pow5_outer
--- compiled input @ matmul-data/2pow20_work_2pow6_outer
--- compiled input @ matmul-data/2pow20_work_2pow7_outer
--- compiled input @ matmul-data/2pow20_work_2pow8_outer
--- compiled input @ matmul-data/2pow20_work_2pow9_outer
--- compiled input @ matmul-data/2pow20_work_2pow10_outer
-
 
 let dotprod [n] (xs: [n]f32) (ys: [n]f32): f32 =
   reduce (+) 0f32 (map2 (*) xs ys)
