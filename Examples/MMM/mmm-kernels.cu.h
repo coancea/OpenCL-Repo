@@ -458,7 +458,8 @@ __global__ void mmmTnRnPar( ElTp* A, ElTp* B, ElTp* C,
       __syncthreads();
   }
 
-  unsigned int indz = blockIdx.z * heightA * widthB;
+  //unsigned int indz = blockIdx.z * heightA * widthB;
+  unsigned int indz = 0;
   unsigned int indy = iii + threadIdx.y * Ry;
   unsigned int indx = jjj + threadIdx.x * Rx;
 
@@ -467,7 +468,8 @@ __global__ void mmmTnRnPar( ElTp* A, ElTp* B, ElTp* C,
     #pragma unroll
     for(int j=0; j<Rx; j++) {
       if( (indy+i < heightA) && (indx+j < widthB) )
-        C[indz + (indy+i)*widthB + (indx+j)] = css[i][j];
+        //C[indz + (indy+i)*widthB + (indx+j)] = css[i][j];
+        atomicAdd( &C[indz + (indy+i)*widthB + (indx+j)], css[i][j]);
     }
   }
 }

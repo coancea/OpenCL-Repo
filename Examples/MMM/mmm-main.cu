@@ -41,9 +41,9 @@
 #else
 
 #if 1
-    #define WIDTH_A  4096//1024 //(1024+17)//1024 //1024//2048
-    #define HEIGHT_A 2048//1024 //(1024+19)//2048//2048//2048
-    #define WIDTH_B  2048//1024 //(1024+23)//4096//2048
+    #define WIDTH_A  1024//4096//1024 //(1024+17)//1024 //1024//2048
+    #define HEIGHT_A 1024//2048//1024 //(1024+19)//2048//2048//2048
+    #define WIDTH_B  1024//2048//1024 //(1024+23)//4096//2048
     #define TILE     16//16
 
     #define Ty  16
@@ -51,7 +51,7 @@
     #define Ry  4
     #define Rx  4
     #define Tk  16
-    #define Rk  32
+    #define Rk  8 //32
 #else
     #define WIDTH_A  (1024+17)//1024 //1024//2048
     #define HEIGHT_A (1024+19)//2048//2048//2048
@@ -104,7 +104,7 @@ void matMult(T* A, T* B, T* C, int colsA, int rowsA, int colsB) {
 template<class T>
 bool validate(float* A,float* B, unsigned int sizeAB){
     for(int i = 0; i < sizeAB; i++)
-      if (fabs(A[i] - B[i]) > 0.0007){
+      if (fabs(A[i] - B[i]) > 0.02) { //0.0007){
         printf("INVALID RESULT %d %f %f\n", i, A[i], B[i]);
         return false;
       }
@@ -349,8 +349,10 @@ int main() {
       cudaMemset(d_C, 0, mem_size_C);
 
       { // one dry run
-        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
-        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
+        cudaMemset(d_C, 0, mem_size_C);
+        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
+//        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
+//        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
         cudaThreadSynchronize();
       }
 
@@ -359,8 +361,10 @@ int main() {
       gettimeofday(&t_start, NULL); 
       
       for(int i=0; i<GPU_RUNS; i++) {
-        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk,Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
-        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
+        cudaMemset(d_C, 0, mem_size_C);
+        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
+//        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk,Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
+//        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
       }
       cudaThreadSynchronize();
 
