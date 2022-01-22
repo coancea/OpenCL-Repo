@@ -17,7 +17,7 @@ void transposeTiled ( ElTp*              inp_d,
    //2. execute the kernel
    matTransposeTiledKer<ElTp,T><<< grid, block, sh_mem_size >>>
                        (inp_d, out_d, height, width); 
-   cudaThreadSynchronize();
+   cudaDeviceSynchronize();
 }
 
 template<class ElTp, int T>
@@ -35,7 +35,7 @@ void transposeNaive ( ElTp*              inp_d,
    //2. execute the kernel
    matTransposeKer<ElTp> <<< grid, block >>>
                           (inp_d, out_d, height, width);
-   cudaThreadSynchronize();
+   cudaDeviceSynchronize();
 }
 
 #endif // TRANSPOSE

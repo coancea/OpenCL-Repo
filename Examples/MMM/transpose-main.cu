@@ -133,7 +133,7 @@ int main() {
         for (int kkk = 0; kkk < REPEAT; kkk++) {
             origProg<<<grid,block>>>(d_A, d_B, num_thds);
         }
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
 
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
@@ -164,7 +164,7 @@ int main() {
             transfProg<<<grid,block>>>(d_Atr, d_Btr, num_thds);
             transposeTiled<float, TILE>( d_Btr, d_B, 64, num_thds );
         }
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
 
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);

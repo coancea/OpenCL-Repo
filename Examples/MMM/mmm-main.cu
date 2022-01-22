@@ -51,7 +51,7 @@
     #define Ry  4
     #define Rx  4
     #define Tk  16
-    #define Rk  8 //32
+    #define Rk  16 //32
 #else
     #define WIDTH_A  (1024+17)//1024 //1024//2048
     #define HEIGHT_A (1024+19)//2048//2048//2048
@@ -184,7 +184,7 @@ int main() {
       gettimeofday(&t_start, NULL); 
       
       matMultKer<float> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);
@@ -215,7 +215,7 @@ int main() {
       { //dry run
         matMultTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
         //matMultCacheKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
       }
 
       unsigned long int elapsed;
@@ -225,7 +225,7 @@ int main() {
       for(int i=0; i<GPU_RUNS; i++) {
           matMultTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
       }
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);
@@ -258,7 +258,7 @@ int main() {
 
       { // one dry run
         matMultRegTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
       }
       cudaMemset(d_C, 0, mem_size_C);
       unsigned long int elapsed;
@@ -268,7 +268,7 @@ int main() {
       for(int i=0; i<GPU_RUNS; i++) {
         matMultRegTiledKer<float,TILE> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
       }
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);
@@ -298,7 +298,7 @@ int main() {
 
       { // one dry run
         mmmTnRn<float,Ty,Ry,Tx,Rx,Tk> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A); 
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
       }
 
       unsigned long int elapsed;
@@ -308,7 +308,7 @@ int main() {
       for(int i=0; i<GPU_RUNS; i++) {
         mmmTnRn<float,Ty,Ry,Tx,Rx,Tk> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
       }
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);
@@ -344,8 +344,8 @@ int main() {
       float *d_Cext;
       cudaMalloc((void**) &d_Cext, mem_size_C*dimz);
     
-      const unsigned int blockred = 256; 
-      const unsigned int dimred = (HEIGHT_A*WIDTH_B + blockred - 1) / blockred;
+//      const unsigned int blockred = 256; 
+//      const unsigned int dimred = (HEIGHT_A*WIDTH_B + blockred - 1) / blockred;
       cudaMemset(d_C, 0, mem_size_C);
 
       { // one dry run
@@ -353,7 +353,7 @@ int main() {
         mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_C, HEIGHT_A, WIDTH_B, WIDTH_A);
 //        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk, Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
 //        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
-        cudaThreadSynchronize();
+        cudaDeviceSynchronize();
       }
 
       unsigned long int elapsed;
@@ -366,7 +366,7 @@ int main() {
 //        mmmTnRnPar<float,Ty,Ry,Tx,Rx,Tk,Rk> <<< grid, block >>>(d_A, d_B, d_Cext, HEIGHT_A, WIDTH_B, WIDTH_A);
 //        seqRedInner<float> <<<dimred, blockred>>>(d_Cext, d_C, HEIGHT_A*WIDTH_B, dimz); 
       }
-      cudaThreadSynchronize();
+      cudaDeviceSynchronize();
 
       gettimeofday(&t_end, NULL);
       timeval_subtract(&t_diff, &t_end, &t_start);

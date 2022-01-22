@@ -1,7 +1,8 @@
 -- ==
+-- random input { [2048][4096]f32 [4096][2048]f32 } auto output
+
 -- random input { [1024][1024]f32 [1024][1024]f32 } auto output
 
--- random input { [2048][4096]f32 [4096][2048]f32 } auto output
 
 -- compiled input @ matmul-data/m10x500x64
 
