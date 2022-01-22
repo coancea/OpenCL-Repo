@@ -4015,7 +4015,7 @@ __kernel void mainzisegmap_intragroup_5571(__global int *global_failure,
     for (int32_t i_21 = 0; i_21 < Ry_5547 * Rx_5549; i_21++)
         ext_mem_unused_6328[i_21] = mem_param_out_6329[i_21];
     
-#if 0
+#if 1
     int64_t slice_6456 = Tx_5548;
     int64_t slice_6457 = Ty_5546 * slice_6456;
     int64_t reg_tile_i_6454 = squot64(sext_i32_i64(local_tid_6369), slice_6456);
