@@ -10,11 +10,11 @@
 
 // nvcc main-cublas.cu -lcublas -lcurand
 
-#define GPU_RUNS 50
+#define GPU_RUNS 3000
 
-#define HEIGHT_A 2048//1024 //(1024+19)//2048//2048//2048
-#define WIDTH_A  4096//1024 //(1024+17)//1024 //1024//2048
-#define WIDTH_B  2048//1024 //(1024+23)//4096//2048
+#define HEIGHT_A 1024//2048//1024 //(1024+19)//2048//2048//2048
+#define WIDTH_A  256//4096//1024 //(1024+17)//1024 //1024//2048
+#define WIDTH_B  1024//2048//1024 //(1024+23)//4096//2048
 
 int timeval_subtract(struct timeval *result, struct timeval *t2, struct timeval *t1)
 {
