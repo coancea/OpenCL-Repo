@@ -76,8 +76,8 @@ void gpu_blas_mmul_rep(const float *A, const float *B, float *C, const int m, co
       elapsed = (t_diff.tv_sec*1e6+t_diff.tv_usec) / GPU_RUNS; 
 
       float microsecPerMatrixMul = elapsed; 
-      double flopsPerMatrixMul = 2.0 * HEIGHT_A * WIDTH_B * WIDTH_A; 
-      double gigaFlops = (flopsPerMatrixMul * 1.0e-9f) / (microsecPerMatrixMul / (1000.0f * 1000.0f)); 
+      double flopsPerMatrixMul = 2.0 * HEIGHT_A * WIDTH_B * WIDTH_A;
+      double gigaFlops = (flopsPerMatrixMul * 1.0e-3f) / microsecPerMatrixMul; 
 
       printf("CUBLAS version runs in: %lu microsecs, GFlops/sec: %f\n", elapsed, gigaFlops);
 
