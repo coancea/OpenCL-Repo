@@ -1,3 +1,4 @@
+#include "Common.h"
 typedef struct OCLControl {
     cl_context          ctx;            // OpenCL context
     cl_device_id        device;      // OpenCL device list
@@ -24,14 +25,14 @@ typedef struct OCLBuffers {
     cl_mem  aggregates; // includes incprefix
     cl_mem  incprefix;
     cl_mem  statusflgs; // includes the flags of aggregates and incprefix
+
+    int32_t num_virtgroups;
 } OclBuffers;
 
 //CpuArrays  arrs;
 OclControl ctrl;
 OclKernels kers;
 OclBuffers buffs;
-
-#define MAX(i,j) ((i)<(j)) ? (j) : (i)
 
 int32_t getNumElemPerThread() {
     float num = (ELEMS_PER_THREAD * 4.0) / sizeof(ElTp);
@@ -100,9 +101,13 @@ void initOclBuffers(const uint32_t N, bool is_sgm, uint8_t* cpu_flg, ElTp* cpu_i
         buffs.statusflgs = clCreateBuffer(ctrl.ctx, CL_MEM_READ_WRITE, size, NULL, &error ); 
         OPENCL_SUCCEED(error);
     }
+
+    {
+        buffs.num_virtgroups = num_blocks;
+    }
 }
 
-void initKernels(const bool is_sgm) {
+void initKernels(const bool is_sgm, const bool do_groupvirt) {
     cl_int ciErr;
     unsigned int counter = 0;
 
@@ -110,12 +115,17 @@ void initKernels(const bool is_sgm) {
         int32_t num_elem_per_thread = getNumElemPerThread();
         const size_t LOCAL_SIZE_EXCG = WORKGROUP_SIZE * num_elem_per_thread;
 
-        kers.single_scan_ker = clCreateKernel(ctrl.prog, is_sgm? "singlePassSgmScanKer" : "singlePassScanKer", &ciErr);
+        char *kernel_ids[][2] = {{"singlePassScanKer", "singlePassSgmScanKer"},
+                                 {"singlePassScanGroupVirtKer", "singlePassSgmScanGroupVirtKer"}};
+        char *kernel_id = kernel_ids[do_groupvirt][is_sgm];
+
+        kers.single_scan_ker = clCreateKernel(ctrl.prog, kernel_id, &ciErr);
         OPENCL_SUCCEED(ciErr);
 
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(uint32_t), (void *)&buffs.N);
         if (is_sgm) {
             ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(cl_mem), (void*)&buffs.gpu_flg); // global flags
+            OPENCL_SUCCEED(ciErr);
         }
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(cl_mem), (void*)&buffs.gpu_inp); // global input
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(cl_mem), (void*)&buffs.gpu_out); // global output
@@ -130,6 +140,11 @@ void initKernels(const bool is_sgm) {
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(int32_t), NULL); // __local block_id
         ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, LOCAL_SIZE_EXCG * sizeof(ElTp), NULL); // __local exchange
         OPENCL_SUCCEED(ciErr);
+
+        if (do_groupvirt) {
+            ciErr |= clSetKernelArg(kers.single_scan_ker, counter++, sizeof(int32_t), (void *)&buffs.num_virtgroups);
+            OPENCL_SUCCEED(ciErr);
+        }
     }
 
     counter = 0;
@@ -148,7 +163,7 @@ void initKernels(const bool is_sgm) {
 
 void gpuToCpuTransfer(const uint32_t N, ElTp* cpu_out) {
     cl_int  ciErr;
-    fprintf(stderr, "GPU-to-CPU Transfer ...\n");
+    DEBUG("GPU-to-CPU Transfer ...\n");
     ciErr = clEnqueueReadBuffer (
                         ctrl.queue, buffs.gpu_out, CL_TRUE,
                         0, N*sizeof(ElTp), cpu_out, 0, NULL, NULL
@@ -157,10 +172,10 @@ void gpuToCpuTransfer(const uint32_t N, ElTp* cpu_out) {
 }
 
 void freeOclBuffKers(bool is_sgm) {
-    fprintf(stderr, "Releasing Kernels...\n");
+    DEBUG("Releasing Kernels...\n");
     clReleaseKernel(kers.single_scan_ker);
 
-    fprintf(stderr, "Releasing GPU buffers ...\n");
+    DEBUG("Releasing GPU buffers ...\n");
     clReleaseMemObject(buffs.gpu_inp);
     if(is_sgm) clReleaseMemObject(buffs.gpu_flg);
     clReleaseMemObject(buffs.gpu_out);
@@ -171,12 +186,12 @@ void freeOclBuffKers(bool is_sgm) {
 }
 
 void freeOclControl() {
-    fprintf(stderr, "Releasing GPU program ...\n");
+    DEBUG("Releasing GPU program ...\n");
     clReleaseProgram(ctrl.prog);
 
-    fprintf(stderr, "Releasing Command Queue ...\n");
+    DEBUG("Releasing Command Queue ...\n");
     clReleaseCommandQueue(ctrl.queue);
         
-    fprintf(stderr, "Releasing GPU context ...\n");
+    DEBUG("Releasing GPU context ...\n");
     clReleaseContext(ctrl.ctx);
 }
