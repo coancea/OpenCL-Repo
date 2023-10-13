@@ -26,7 +26,15 @@ typedef unsigned int  uint32_t;
 #define lgWARP              5
 #define WARP                (1<<lgWARP)
 
+
+#ifndef WORKGROUP_SIZE
 #define WORKGROUP_SIZE      512
-#define logWORKGROUP_SIZE   9
+#endif
+
+#if (WORKGROUP_SIZE) % 32 != 0
+#error "WORKGROUP_SIZE must be a multiple of 32"
+#endif
+
+#define logWORKGROUP_SIZE (31 - __builtin_clz((WORKGROUP_SIZE) | 1))
 
 #endif // COMMON_H

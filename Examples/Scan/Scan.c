@@ -163,11 +163,11 @@ void runTest(const uint32_t N, ElTp *cpu_input, uint8_t *cpu_flags, ElTp *cpu_re
     }
 
     printf("\n==============================================\n");
-    if (is_segmented) printf("=== Segmented scan, ");
-    else              printf("=== Regular scan, ");
-    if (do_groupvirt) printf("group virtualization ON  ===\n");
-    else              printf("group virtualization OFF ===\n");
+    char *s1 = is_segmented ? "Regular" : "Segmented";
+    char *s2 = do_groupvirt ? "ON " : "OFF";
+    printf("=== %s scan, group virtualization %-*s ===\n", s1, !is_segmented * 5, s2);
     printf("==============================================\n");
+
 
     // init buffers and kernels arguments
     initOclBuffers(N, is_segmented, cpu_flags, cpu_input);
@@ -223,20 +223,20 @@ int main(int argc, char **argv) {
     initOclControl();
 
     // regular scan
-    runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            !SEGMENTED, !GROUPVIRT, num_requested_groups);
+    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+            // !SEGMENTED, !GROUPVIRT, num_requested_groups);
 
     // regular scan with group virtualization
-    runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            !SEGMENTED, GROUPVIRT, num_requested_groups);
+    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+            // !SEGMENTED, GROUPVIRT, num_requested_groups);
 
     // segmented scan
     runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
             SEGMENTED, !GROUPVIRT, num_requested_groups);
 
     // segmented scan with group virtualization
-    runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            SEGMENTED, GROUPVIRT, num_requested_groups);
+    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+            // SEGMENTED, GROUPVIRT, num_requested_groups);
 
 
     freeOclControl();
