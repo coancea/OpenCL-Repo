@@ -3,7 +3,7 @@
 #include <math.h>
 
 #define REPEAT              800
-#define ELEMS_PER_THREAD    23//11//9
+#define ELEMS_PER_THREAD    20//11//9
 
 #include "GenericHack.h"
 #include "SetupOpenCL.h"
@@ -34,7 +34,7 @@ int64_t runMemCopy() {
             clFinish(ctrl.queue);
         }
         aft = get_wall_time();
-        elapsed = aft - bef;
+        elapsed = (aft - bef) / REPEAT;
         OPENCL_SUCCEED(ciErr1);
     }
     return elapsed;
@@ -100,7 +100,7 @@ int64_t runSinglePassScan(bool do_groupvirt, int32_t num_requested_groups) {
             clFinish(ctrl.queue);
         }
         aft = get_wall_time();
-        elapsed = aft - bef;
+        elapsed = (aft - bef) / REPEAT;
         OPENCL_SUCCEED(ciErr1);
     }
 
@@ -155,15 +155,17 @@ bool validate(const uint32_t N, ElTp* cpu_out, ElTp* gpu_out, uint32_t eps_range
 void runTest(const uint32_t N, ElTp *cpu_input, uint8_t *cpu_flags, ElTp *cpu_ref, ElTp *cpu_out,
      bool is_segmented, bool do_groupvirt, int32_t num_requested_groups) {
 
+#if 0
     if (is_segmented && do_groupvirt) {
         printf("\n\x1b[31;1mSkipping run of segmented scan with group "
                "virtualization ON, since for some\nreason it gives "
                "CL_OUT_OF_RESOURCES errors. TODO: Find out why.\n\n\x1b[0m");
         return;
     }
+#endif
 
     printf("\n==============================================\n");
-    char *s1 = is_segmented ? "Regular" : "Segmented";
+    char *s1 = is_segmented ? "Segmented" : "Regular";
     char *s2 = do_groupvirt ? "ON " : "OFF";
     printf("=== %s scan, group virtualization %-*s ===\n", s1, !is_segmented * 5, s2);
     printf("==============================================\n");
@@ -223,20 +225,20 @@ int main(int argc, char **argv) {
     initOclControl();
 
     // regular scan
-    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            // !SEGMENTED, !GROUPVIRT, num_requested_groups);
+    runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+            !SEGMENTED, !GROUPVIRT, num_requested_groups);
 
     // regular scan with group virtualization
-    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            // !SEGMENTED, GROUPVIRT, num_requested_groups);
+    runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+             !SEGMENTED, GROUPVIRT, num_requested_groups);
 
     // segmented scan
     runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
             SEGMENTED, !GROUPVIRT, num_requested_groups);
 
     // segmented scan with group virtualization
-    // runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
-            // SEGMENTED, GROUPVIRT, num_requested_groups);
+     runTest(N, cpu_inp, cpu_flg, cpu_ref, cpu_out,
+             SEGMENTED, GROUPVIRT, num_requested_groups);
 
 
     freeOclControl();
